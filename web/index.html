@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Onboarding Agent Demo</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="noise"></div>
+    <main class="shell">
+      <section class="console panel">
+        <section id="chatLog" class="chat-log" aria-live="polite"></section>
+
+        <section id="choicePanel" class="choice-panel hidden" aria-live="polite"></section>
+
+        <form id="composer" class="composer">
+          <div class="composer-row">
+            <textarea id="messageInput" rows="2" placeholder="直接说想吃的、想做的，或者有什么想聊的"></textarea>
+            <button id="sendButton" class="primary-button" type="submit">发送</button>
+          </div>
+        </form>
+      </section>
+
+      <aside class="portrait panel">
+        <header class="portrait-header">
+          <p class="eyebrow">你的画像</p>
+          <p id="greetingLine" class="greeting-line hidden"></p>
+          <div class="portrait-toolbar">
+            <button id="skipButton" class="skip-button" type="button">先跳过 →</button>
+            <button id="revealButton" class="secondary-button" type="button" disabled>查看我的画像</button>
+            <button id="resetButton" class="secondary-button" type="button">重开</button>
+          </div>
+        </header>
+        <section id="portraitContent" class="portrait-content"></section>
+      </aside>
+    </main>
+
+    <template id="bubbleTemplate">
+      <article class="bubble">
+        <p class="bubble-role"></p>
+        <div class="bubble-body"></div>
+      </article>
+    </template>
+
+    <div id="nicknameModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+      <div class="modal-panel panel">
+        <p class="eyebrow">先认识一下</p>
+        <h2>给自己起个名字吧</h2>
+        <p class="lede">
+          之后的画像卡片会署上这个名字。只会存在浏览器里和这台机器的数据库里，换浏览器就不认识你了。
+        </p>
+        <form id="nicknameForm" class="nickname-form">
+          <input
+            id="nicknameInput"
+            type="text"
+            maxlength="20"
+            autocomplete="nickname"
+            placeholder="比如：阿禾、小 L、随便啥"
+            required
+          />
+          <button type="submit" class="primary-button">开始</button>
+        </form>
+        <p id="nicknameError" class="nickname-error hidden"></p>
+      </div>
+    </div>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>

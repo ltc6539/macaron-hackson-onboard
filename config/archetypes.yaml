@@ -1,0 +1,184 @@
+# Archetype 映射
+# 从 5 维画像到用户可见的人格类型
+# 每个 archetype 由若干维度的符号组合定义
+
+archetypes:
+
+  midnight_wanderer:
+    name: "深夜漫游者"
+    emoji: "🌙"
+    match_rules:
+      novelty_appetite: ">0"
+      control_flow: "<0"
+      social_energy: "<0"
+    description: |
+      你的快乐来自无目的的游荡。最好的发现永远在计划之外，
+      最好吃的店永远在迷路的时候碰到。你不需要别人告诉你去哪，
+      但你欢迎一个懂你的搭子偶尔丢一个线索。
+    agent_promise: |
+      我不会给你做计划。
+      但我会在你漫无目的的时候，悄悄在你的路线上埋一两个惊喜。
+      你说"随便"的时候，我不会真的随便——我会给你一个你没见过但一定会喜欢的。
+
+  precision_hedonist:
+    name: "精准享乐家"
+    emoji: "🎯"
+    match_rules:
+      sensory_cerebral: "<0"
+      novelty_appetite: ">0"
+      control_flow: ">0"
+    description: |
+      你追求快乐，但你的快乐是有标准的。你会花时间研究、对比、筛选，
+      然后精准地找到最值得的那个选择。别人觉得你挑剔，但你知道这叫品味。
+    agent_promise: |
+      我会给你数据、对比、理由，然后让你自己做决定。
+      你的每一次选择我都会学习——我的推荐会越来越"你"。
+      对了，我不会用"随便看看"这种话敷衍你。
+
+  vibe_curator:
+    name: "氛围策展人"
+    emoji: "✨"
+    match_rules:
+      sensory_cerebral: ">0"
+      social_energy: ">0"
+    description: |
+      对你来说，吃什么远没有"在哪吃、跟谁吃、什么感觉"重要。
+      你是朋友圈里的聚餐发起人，选餐厅的理由从来不是菜单，而是氛围。
+    agent_promise: |
+      推荐的时候我会给你看环境照片，而不是菜单。
+      我会记住你每次聚餐的人数和场景，下次直接给你对的答案。
+      如果你说"找个有感觉的地方"——我真的能听懂。
+
+  home_alchemist:
+    name: "厨房炼金术士"
+    emoji: "🧪"
+    match_rules:
+      sensory_cerebral: ">0"
+      control_flow: ">0"
+      decision_tempo: "<0"
+    description: |
+      你的厨房是实验室，冰箱是素材库。你享受把普通食材变成一道菜的过程，
+      那种掌控感和创造力是外面任何餐厅都给不了的。
+    agent_promise: |
+      我会帮你发现新的食材搭配和技法。
+      你说"冰箱里有鸡蛋、味噌和一根葱"，我能给你三个不同的方案。
+      偶尔我也会推荐一家值得你出门的店——用来给你找灵感。
+
+  social_connector:
+    name: "干饭局局长"
+    emoji: "🔥"
+    match_rules:
+      social_energy: ">0"
+      decision_tempo: ">0"
+      control_flow: "<0"
+    description: |
+      你的字典里没有"一个人吃饭"这个选项。对你来说，
+      食物是社交润滑剂，餐桌是最好的社交场。你最怕的不是吃得差，
+      而是没人一起吃。
+    agent_promise: |
+      我帮你组局、订位、发邀请，一条龙服务。
+      你说"周六想吃火锅"，我直接帮你搞定地点和人——你只需要到场。
+      "谁想来"这个问题你来回答，剩下的交给我。
+
+  comfort_seeker:
+    name: "味觉守护者"
+    emoji: "🏠"
+    match_rules:
+      novelty_appetite: "<0"
+      sensory_cerebral: ">0"
+    description: |
+      你有一张属于自己的美食地图，每家店都是反复验证过的。
+      你不抗拒新东西，但你更珍惜那些"就是这个味道"的确定感。
+      最好吃的永远是记忆里的味道。
+    agent_promise: |
+      我会记住你每一家"老地方"，你说"老样子"我就知道该订哪家。
+      我不会一直给你塞新的——但如果我发现一家跟你"老地方"风格很像的新店，
+      我会小心翼翼地推荐给你。
+
+  efficient_enjoyer:
+    name: "快准狠美食家"
+    emoji: "⚡"
+    match_rules:
+      decision_tempo: ">0"
+      sensory_cerebral: "<0"
+      control_flow: ">0"
+    description: |
+      你知道自己要什么，不需要花半小时选餐厅。
+      评分 4.5 以上、距离 2 公里以内、人均 150 以下——下单。
+      效率就是你的美学。
+    agent_promise: |
+      我给你选项永远不超过 3 个，每个都带评分和距离。
+      你说"附近吃个午饭"，30 秒内出结果。
+      我不写散文，只给你需要的信息。
+
+  mindful_nourisher:
+    name: "佛系养生家"
+    emoji: "🌿"
+    match_rules:
+      control_flow: "<0"
+      decision_tempo: "<0"
+      social_energy: "<0"
+    description: |
+      你吃东西跟着感觉走，不纠结也不将就。
+      不一定追求健康但追求平衡，不一定精致但一定舒服。
+      你的节奏是慢的，但你知道自己在做什么。
+    agent_promise: |
+      我不会催你做决定，也不会一次给你太多选项。
+      你需要我的时候我在，不需要的时候我安静。
+      偶尔我会给你一个灵感——不是推荐，只是"我觉得你可能会喜欢这个"。
+
+  # 行为型 archetype：不走 5 维 match_rules，由 ArchetypeMapper 按
+  # behavioral 规则单独判定（见 _match_behavioral）。用户点了"先跳过"
+  # 又几乎不回话的场景兜底。
+  dan_ren:
+    name: "淡人"
+    emoji: "🫥"
+    behavioral: "low_engagement_skipper"
+    description: |
+      你没做测试，也没多聊——这很"淡"。淡不是没感觉，
+      是你知道什么重要、什么不重要，不需要被看穿，
+      也不需要解释自己。
+    agent_promise: |
+      那我就不问了。你开口的时候我在，不开口的时候我也不缠你。
+      你只管来一句"想吃点什么"，剩下的我收。
+
+# Fallback archetype（当没有匹配或 confidence 不足时）
+fallback:
+  name: "美食探索中"
+  emoji: "🧭"
+  description: |
+    你的美食人格还在显影中——就像一张宝丽来，轮廓已经出现了，
+    但还需要再多一点时间才能看清。这其实是最有趣的阶段，因为一切都还有可能。
+  agent_promise: |
+    我还在学习了解你。接下来的日子里，我会通过我们的互动慢慢理解你的偏好。
+    你不需要刻意告诉我什么——你只管用，我会越来越懂你。
+
+# 匹配逻辑配置
+matching:
+  # 至少需要多少个维度 confidence > threshold 才尝试匹配
+  min_confident_dimensions: 3
+  confidence_threshold: 0.45
+  # 当多个 archetype 都匹配时，选匹配维度最多的
+  tiebreak: "most_matching_dimensions"
+
+# ============================================================
+# Macaron 能力承诺
+# ============================================================
+# 给最终卡片的"Macaron 会怎么配合你"区块用。
+# 按维度 × 极性映射一条具体能力承诺；生成时取 top 维度的 2–3 条。
+macaron_promises_by_dim:
+  novelty_appetite:
+    positive: "每次给你推荐我都会混一家你绝对没见过的"
+    negative: "我会记住你每一家老地方，\"老样子\"我就知道订哪家"
+  decision_tempo:
+    positive: "我给你的选项永远不超过 3 个，30 秒能下单"
+    negative: "我会带评分、距离、人均一起给，你可以慢慢比"
+  social_energy:
+    positive: "要组局我帮你发投票、收口味、定位子，一条龙"
+    negative: "我会优先给你找安静的、吧台位友好的一人食"
+  sensory_cerebral:
+    positive: "推餐厅我先丢 3 张环境照给你看，不是菜单"
+    negative: "我给你的推荐永远带评分、人均、距离这些硬数据"
+  control_flow:
+    positive: "我给你列选项和理由，你拍板，我不替你做决定"
+    negative: "你说\"随便\"的时候我不会真的随便——我直接给你一个"

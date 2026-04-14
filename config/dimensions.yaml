@@ -1,0 +1,93 @@
+# 五维用户画像模型
+# 每个维度是一个 -1.0 到 +1.0 的连续值
+# negative_pole ←——→ positive_pole
+
+dimensions:
+  novelty_appetite:
+    display_name: "新鲜感渴求度"
+    negative_pole: "loyalist"      # 忠诚型：偏好熟悉的、确定的
+    positive_pole: "explorer"      # 探索型：追求新鲜的、未知的
+    description: "面对未知事物时的本能反应模式"
+    behavioral_mapping:
+      positive:  # explorer
+        - 推荐策略偏向 diversity，混入新开的/冷门的选项
+        - 不反复推荐同一家店
+        - 推荐文案强调"新"、"第一次"、"隐藏"
+      negative:  # loyalist
+        - 推荐策略偏向 recall，优先展示用过且好评的
+        - 发现用户喜欢的店后持续推荐
+        - 推荐文案强调"你最爱的"、"老朋友"、"回归"
+
+  decision_tempo:
+    display_name: "决策节奏"
+    negative_pole: "deliberate"    # 审慎型：收集信息、对比、再决定
+    positive_pole: "impulsive"     # 直觉型：快速决策、跟着感觉走
+    description: "做选择时是快刀斩乱麻还是深思熟虑"
+    behavioral_mapping:
+      positive:  # impulsive
+        - 给更少的选项（1-2个），避免选择疲劳
+        - Agent 更主动地替用户做决定
+        - 推荐时直接给结论，不列对比
+      negative:  # deliberate
+        - 给结构化的对比信息（评分/价格/距离）
+        - 允许用户自己筛选和排序
+        - 推荐时附上理由和数据支撑
+
+  social_energy:
+    display_name: "社交能量"
+    negative_pole: "solo"          # 独处型：能量来源于独处
+    positive_pole: "social"        # 社交型：能量来源于人群
+    description: "生活中的能量来源和消耗模式"
+    behavioral_mapping:
+      positive:  # social
+        - 推荐时考虑"适合多人"、"有包间"、"热闹"
+        - 主动提供订位和组局辅助
+        - 推荐文案涉及社交场景
+      negative:  # solo
+        - 推荐时考虑"安静"、"吧台位"、"一人食友好"
+        - 侧重个人体验而非社交属性
+        - 不过度推荐聚餐场景
+
+  sensory_cerebral:
+    display_name: "感性-理性光谱"
+    negative_pole: "cerebral"      # 理性型：数据驱动、分析导向
+    positive_pole: "sensory"       # 感性型：感官驱动、氛围导向
+    description: "面对选择时，是身体先反应还是脑子先反应"
+    behavioral_mapping:
+      positive:  # sensory
+        - A2UI 偏好：大图卡片、carousel、视觉优先
+        - 推荐文案偏氛围描写（"暖黄灯光"、"入口即化"）
+        - 减少数字和评分的展示权重
+      negative:  # cerebral
+        - A2UI 偏好：对比表格、结构化数据、评分优先
+        - 推荐文案偏事实陈述（"人均 ¥200"、"4.8 分"）
+        - 提供更多筛选和排序工具
+
+  control_flow:
+    display_name: "掌控感偏好"
+    negative_pole: "flow"          # 随遇而安：喜欢被安排、接受惊喜
+    positive_pole: "control"       # 掌控型：喜欢自己规划、掌握全局
+    description: "喜欢自己做主还是喜欢被人安排得妥妥的"
+    behavioral_mapping:
+      positive:  # control
+        - Agent 提供选项和工具，让用户自己决定
+        - 推送时给足提前量（48h+）
+        - 不要擅自做决定，每步都确认
+      negative:  # flow
+        - Agent 更主动地安排和推荐
+        - "我帮你选了这家" 而不是 "这里有三个选项"
+        - 适合做惊喜推荐
+
+# 信号源的默认置信度权重
+signal_confidence:
+  quiz_answer: 0.35        # 一道趣味题的信号
+  direct_preference: 0.40  # 用户直接表达的偏好
+  choice_inference: 0.25   # 从二选一中推断
+  reaction_observation: 0.15  # 从对推荐的反应中推断
+  behavioral_pattern: 0.10    # 单次行为观察（需要积累）
+
+# 画像激活阈值
+confidence_thresholds:
+  active: 0.55       # 可以基于此维度做个性化
+  tentative: 0.30    # 弱先验，需确认（"我猜你可能..."）
+  inactive: 0.30     # 低于此值不使用，回退默认

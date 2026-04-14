@@ -1,0 +1,194 @@
+# Agent 行为策略
+# 定义 Agent 在每一轮对话中的决策规则
+
+# ============================================================
+# 用户状态检测配置
+# ============================================================
+user_state:
+  states:
+    engaged_playful:
+      description: "用户在玩，心情好，可以问有趣的问题"
+      indicators:
+        - "回复带 emoji 或语气词"
+        - "回复长度 > 平均值"
+        - "主动追问或展开话题"
+        - "表达好奇（'有意思'、'然后呢'、'还有吗'）"
+      allowed_actions: ["ask_playful", "ask_direct", "offer_choice", "self_disclose", "give_value"]
+
+    task_oriented:
+      description: "用户有事要办，别废话"
+      indicators:
+        - "第一句话就带明确意图"
+        - "回复简短、信息密度高"
+        - "忽略 Agent 的闲聊尝试"
+      allowed_actions: ["offer_choice", "observe_reaction", "give_value"]
+
+    tentative_exploring:
+      description: "用户在试探产品边界"
+      indicators:
+        - "问'你能做什么'、'比如呢'"
+        - "试探性小需求"
+        - "不投入太多个人信息"
+      allowed_actions: ["self_disclose", "give_value", "offer_choice"]
+
+    guarded:
+      description: "用户有戒备心"
+      indicators:
+        - "回复极短（'嗯'、'好'、'行'）"
+        - "不回答开放性问题"
+        - "给模糊回答（'都行'、'随便'）"
+      allowed_actions: ["give_value", "observe_reaction", "do_nothing"]
+
+    disengaging:
+      description: "用户在失去兴趣"
+      indicators:
+        - "回复越来越短"
+        - "出现终结性回复（'好的'、'知道了'、'嗯嗯'）"
+        - "不再追问"
+      allowed_actions: ["give_value", "do_nothing"]
+
+# ============================================================
+# 行动空间定义
+# ============================================================
+actions:
+  ask_playful:
+    description: "用趣味题的方式探测偏好"
+    info_gain: "high"
+    social_cost: "medium"
+    preconditions:
+      min_rapport: 0.3
+      required_states: ["engaged_playful"]
+      max_consecutive_asks: 1  # 不能连续问两次
+
+  ask_direct:
+    description: "直接问一个偏好问题"
+    info_gain: "high"
+    social_cost: "high"
+    preconditions:
+      min_rapport: 0.5
+      required_states: ["engaged_playful"]
+      max_consecutive_asks: 1
+
+  offer_choice:
+    description: "在任务执行中给出选项，从选择中推断"
+    info_gain: "medium"
+    social_cost: "low"
+    preconditions:
+      min_rapport: 0.0
+      required_states: ["engaged_playful", "task_oriented", "tentative_exploring"]
+      requires_active_task: true
+
+  observe_reaction:
+    description: "给一个推荐，观察用户的反应"
+    info_gain: "low_to_medium"
+    social_cost: "very_low"
+    preconditions:
+      min_rapport: 0.0
+      required_states: ["engaged_playful", "task_oriented", "tentative_exploring", "guarded"]
+
+  self_disclose:
+    description: "Agent 先分享一个观察/想法，邀请用户回应"
+    info_gain: "medium"
+    social_cost: "low"
+    preconditions:
+      min_rapport: 0.2
+      required_states: ["engaged_playful", "tentative_exploring"]
+
+  give_value:
+    description: "不问任何问题，纯粹给用户一个有用的东西"
+    info_gain: "none"
+    social_cost: "negative"  # 增加信任
+    preconditions:
+      min_rapport: 0.0
+      required_states: ["engaged_playful", "task_oriented", "tentative_exploring", "guarded", "disengaging"]
+
+  do_nothing:
+    description: "不主动发起，回应用户但不引导"
+    info_gain: "none"
+    social_cost: "none"
+    preconditions:
+      min_rapport: 0.0
+      required_states: ["guarded", "disengaging"]
+
+# ============================================================
+# 决策规则
+# ============================================================
+decision_rules:
+  # 规则 1：永远不要连续问两个问题
+  no_consecutive_asks:
+    description: "如果上一轮是 ask_*，这一轮必须是非 ask 动作"
+    priority: 1
+
+  # 规则 2：信任不够时用行动而不是语言
+  rapport_gates:
+    low:   # rapport < 0.3
+      allowed: ["give_value", "observe_reaction", "do_nothing"]
+    medium: # 0.3 <= rapport < 0.6
+      allowed: ["offer_choice", "self_disclose", "observe_reaction", "give_value"]
+    high:   # rapport >= 0.6
+      allowed: ["ask_playful", "ask_direct", "offer_choice", "self_disclose", "observe_reaction", "give_value"]
+
+  # 规则 3：读懂"随便"
+  casual_response_handling:
+    defensive_casual:
+      pattern: "在被问偏好时回避"
+      action: "stop asking, switch to give_value"
+    trusting_casual:
+      pattern: "轻松语气，信任 Agent 做决定"
+      action: "Agent 主动推荐，从反应中学习"
+    lazy_casual:
+      pattern: "有需求但不想决策"
+      action: "直接给最佳选项，这本身是 control_flow 信号"
+
+  # 规则 4：见好就收
+  stopping_criteria:
+    mean_confidence_sufficient: 0.50
+    max_questions_if_not_engaged: 3
+    max_questions_total: 5
+    switch_to_passive_after_stop: true
+
+# ============================================================
+# 信任（Rapport）更新规则
+# ============================================================
+rapport:
+  initial_value: 0.25
+  max_value: 1.0
+  min_value: 0.0
+
+  positive_signals:
+    - { event: "user_answers_open_question", delta: 0.08 }
+    - { event: "user_asks_followup", delta: 0.10 }
+    - { event: "user_shares_personal_info", delta: 0.12 }
+    - { event: "user_uses_emoji_or_humor", delta: 0.05 }
+    - { event: "user_accepts_recommendation", delta: 0.06 }
+    - { event: "user_says_thanks", delta: 0.04 }
+    - { event: "user_long_response", delta: 0.05 }
+
+  negative_signals:
+    - { event: "user_ignores_question", delta: -0.10 }
+    - { event: "user_gives_minimal_response", delta: -0.05 }
+    - { event: "user_rejects_recommendation", delta: -0.03 }
+    - { event: "user_expresses_annoyance", delta: -0.15 }
+    - { event: "user_says_skip_or_stop", delta: -0.20 }
+
+  # 衰减：每轮对话 rapport 自然衰减（用户的耐心是有限的）
+  decay_per_turn: 0.01
+
+# ============================================================
+# Onboarding 入口配置
+# ============================================================
+entry:
+  greeting_message: |
+    嘿！我是你的生活搭子 🙌
+    我能帮你找好吃的、订位、做饭、安排周末——基本上跟"吃喝玩乐"有关的我都能管。
+  
+  entry_options:
+    quiz:
+      trigger_phrases: ["好啊", "测试", "试试", "好的", "来", "做题", "测一下"]
+      response: "那我们开始。放轻松，没有标准答案——每个选择都很酷。"
+    skip:
+      trigger_phrases: ["跳过", "不用了", "直接开始", "算了", "不做"]
+      response: "完全没问题。那你现在有什么想吃的或者想做的吗？我们边聊边熟悉。"
+    curious:
+      trigger_phrases: ["你能做什么", "比如呢", "怎么用", "什么功能"]
+      response: "简单说——你说'饿了'我帮你找吃的，你说'周六聚餐'我帮你订位，你说'不想出门'我给你推食谱。要不我直接演示一下？"
