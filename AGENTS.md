@@ -23,11 +23,13 @@ Key product differentiator: the system tries to learn while being useful. It can
 - `agent/conversation_manager.py`: canonical turn loop; read this first when behavior seems surprising.
 - `tests/test_onboarding_smoke.py`: best executable spec for expected behavior.
 
-## RUNTIME MODES
-- Template mode: no API key, or `--llm none`; replies come from hardcoded fallback text in `prompts/response_generator.py`. State machine still runs, but UX feels questionnaire-like.
-- LLM mode: `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` present, or explicit `--llm anthropic/openai`; user-state detection, signal extraction, fatigue analysis, and final response generation can all use the model.
+## RUNTIME REQUIREMENTS
+- The product now runs in LLM-only mode; CLI/Web startup fails fast if no provider is configured.
+- `main.py` and `web_demo.py` auto-load project-root `.env`, and local project config takes precedence over inherited shell variables.
+- LLM mode uses `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`, or explicit `--llm anthropic/openai`; user-state detection, signal extraction, fatigue analysis, and final response generation can all use the model.
 - Auto-detect precedence in both `main.py` and `web_demo.py`: Anthropic first, then OpenAI.
 - OpenAI path is OpenAI-compatible, not OpenAI-only: it honors `OPENAI_BASE_URL` and `OPENAI_MODEL`.
+- `prompts/response_generator.py` still contains legacy fallback helpers, but current entrypoints do not expose template mode anymore.
 
 ## STRUCTURE
 - `main.py`: terminal chat loop; supports `/debug`, `/profile`, `/quit`.
@@ -61,7 +63,6 @@ Key product differentiator: the system tries to learn while being useful. It can
 | Run CLI in debug | `python3 main.py --debug` |
 | Run Web demo | `python3 web_demo.py --port 8123` |
 | Run Web demo with custom DB | `python3 web_demo.py --port 8123 --db /tmp/onboarding.db` |
-| Force template mode | `python3 web_demo.py --llm none` |
 | Run tests | `python3 -m unittest discover -s tests -q` |
 | Compile smoke check | `python3 -m compileall main.py web_demo.py core agent prompts tests` |
 
@@ -98,7 +99,7 @@ Important: live sessions are in-memory only (`SessionStore.sessions`). DB persis
 - Pending quiz/choice buttons always get an extra `meh` option in `get_pending_choices()`.
 - Two `meh` picks trigger a one-time meta-prefix and force `ProfilingMode.PASSIVE`.
 - Task follow-ups are sticky: short replies like `评分高一点`, `近一点`, `你帮我选` extend `active_task` instead of starting a fresh flow.
-- Template mode still uses structured A/B choices; only the language generation is static.
+- Legacy fallback code still exists in a few modules for testing/internal use, but CLI/Web no longer expose template mode.
 
 ## FATIGUE / RAPPORT / REVEAL THRESHOLDS
 - Rapport starts at `0.25` and decays each turn.
@@ -173,6 +174,6 @@ If you change onboarding behavior, re-run tests and manually try:
 - `SessionStore` owns in-memory managers and a `_profiles_saved` set; restarting the process resets those ephemeral structures.
 - `web_demo.py` silently swallows normal HTTP logging by overriding `log_message()`.
 - The Web demo is local-only and intentionally lacks auth, CSRF protection, or production deployment hardening.
-- If you document UX claims, distinguish template mode from LLM mode explicitly; otherwise the project will look worse than intended.
+- User-facing docs and demos should assume LLM mode; if you touch legacy fallback code, treat it as internal/testing-only behavior.
 - Existing SQLite files may already be present under `data/`; avoid assuming a fresh DB.
 - If onboarding logic changes, update both docs (`README.md`, `AGENTS.md`) and tests together.

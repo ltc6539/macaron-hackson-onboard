@@ -28,43 +28,23 @@
 - `Decide`：选择 `ask_playful` / `offer_choice` / `give_value` / `evaluate_user` / `show_archetype` 等行动
 - `Act`：生成回复、挂起下一题、或揭示画像
 
-## 两种运行模式（非常重要）
+## 运行要求（LLM only）
 
-项目有两种体验，差别很大：
+当前项目只保留 LLM mode，不再对外提供 template mode。
 
-### 1. Template mode
+也就是说：
 
-没有设置 API key 时，回复来自硬编码模板：
-
-- 用户状态机仍然会跑
-- `rapport`、`fatigue`、`profile` 仍然会更新
-- quiz、A/B 选择题、跳过画像、最终 archetype 仍然能触发
-- 但回复文案不会真正根据上下文灵活变化
-
-所以它更适合：
-
-- 本地离线开发
-- 验证状态机和前端交互
-- 跑 smoke tests
-
-不适合用来证明“这个 onboarding 很像 Agent”。
-
-### 2. LLM mode
-
-设置 API key 后，Anthropic Claude 或 OpenAI 兼容接口会参与：
-
-- 用户状态检测可走 LLM 精细判断
-- 画像信号可做 LLM 抽取
+- 用户状态检测默认走规则 + LLM
+- 画像信号可走 LLM 抽取
 - fatigue 可做更细的被问烦检测
 - 回复由模型根据 action、rapport、profile、task context 现场生成
+- 如果没有可用 provider，CLI / Web 启动时会直接报错，而不是退回模板
 
-这才是更完整的体验。
+Provider 选择规则：
 
-自动检测规则：
-
-- `ANTHROPIC_API_KEY` 优先
-- 否则看 `OPENAI_API_KEY`
-- 可显式传 `--llm none` 强制模板模式
+- 显式传 `--llm anthropic` 或 `--llm openai` 时，按参数走
+- 不显式传时，自动检测环境变量
+- 自动检测优先级：`ANTHROPIC_API_KEY` 优先，其次 `OPENAI_API_KEY`
 
 ## 快速开始
 
@@ -86,10 +66,9 @@ python3 -m pip install openai anthropic
 
 ```bash
 cp .env.example .env
-set -a; source .env; set +a
 ```
 
-注意：当前代码是直接读取环境变量，并不会自动加载 `.env`。
+当前 CLI / Web 入口会自动从项目根目录读取 `.env`，并让项目本地配置优先于外部环境变量。
 
 ### 跑 CLI demo
 
@@ -101,7 +80,6 @@ python3 main.py
 
 ```bash
 python3 main.py --debug
-python3 main.py --llm none
 python3 main.py --llm openai
 python3 main.py --llm anthropic
 ```
@@ -122,7 +100,6 @@ python3 web_demo.py --port 8123
 
 ```bash
 python3 web_demo.py --host 127.0.0.1 --port 8123
-python3 web_demo.py --llm none
 python3 web_demo.py --llm openai
 python3 web_demo.py --llm anthropic
 python3 web_demo.py --db data/onboarding.db

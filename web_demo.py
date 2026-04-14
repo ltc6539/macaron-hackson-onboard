@@ -1,7 +1,6 @@
 import argparse
 import asyncio
 import json
-import os
 import re
 import uuid
 from http import HTTPStatus
@@ -12,7 +11,7 @@ from typing import Optional
 
 from agent.conversation_manager import ConversationManager
 from core.persistence import PersistenceStore
-from main import AnthropicClient, OpenAIClient
+from main import build_llm_client, resolve_llm_type
 
 ROOT = Path(__file__).parent
 WEB_DIR = ROOT / "web"
@@ -20,33 +19,6 @@ WEB_DIR = ROOT / "web"
 COOKIE_NAME = "macaron_uid"
 COOKIE_MAX_AGE = 60 * 60 * 24 * 365   # 1 year
 NICKNAME_MAX_LEN = 20
-
-
-def build_llm_client(llm_type: Optional[str]):
-    if llm_type == "openai":
-        return OpenAIClient()
-    if llm_type == "anthropic":
-        return AnthropicClient()
-    return None
-
-
-def resolve_llm_type(cli_choice: Optional[str]) -> Optional[str]:
-    """
-    决定最终的 LLM 类型：
-      --llm anthropic / openai    强制用这个
-      --llm none                  强制模板模式
-      未指定                       按环境变量自动：ANTHROPIC_API_KEY 优先，其次 OPENAI_API_KEY
-    """
-    if cli_choice == "none":
-        return None
-    if cli_choice in ("anthropic", "openai"):
-        return cli_choice
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        return "anthropic"
-    if os.environ.get("OPENAI_API_KEY"):
-        return "openai"
-    return None
-
 
 def _sanitize_nickname(raw: str) -> str:
     cleaned = (raw or "").strip()
@@ -490,16 +462,19 @@ def main():
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument(
         "--llm",
-        choices=["openai", "anthropic", "none"],
+        choices=["openai", "anthropic"],
         default=None,
-        help="留空会按环境变量自动启用（ANTHROPIC_API_KEY 优先，然后 OPENAI_API_KEY）；"
-             "显式传 `none` 强制模板模式",
+        help="LLM provider；留空按环境变量自动探测（Anthropic 优先，其次 OpenAI-compatible）",
     )
     parser.add_argument("--db", default=None, help="SQLite path（默认 data/onboarding.db）")
     args = parser.parse_args()
 
+    try:
+        llm_type = resolve_llm_type(args.llm)
+    except ValueError as exc:
+        raise SystemExit(str(exc))
+
     db = PersistenceStore(Path(args.db)) if args.db else PersistenceStore()
-    llm_type = resolve_llm_type(args.llm)
     DemoHandler.store = SessionStore(llm_type=llm_type, db=db)
     server = ThreadingHTTPServer((args.host, args.port), DemoHandler)
 
@@ -507,13 +482,8 @@ def main():
     print(f"DB at {db.db_path}")
     if llm_type == "anthropic":
         print("LLM mode: Anthropic Claude —— Agent 会现场生成回复、主动评价你。")
-    elif llm_type == "openai":
-        print("LLM mode: OpenAI —— Agent 会现场生成回复、主动评价你。")
     else:
-        print(
-            "Template mode —— 所有回复都是硬编码模板，体验会像问卷。\n"
-            "要真 Agent 感请设置 ANTHROPIC_API_KEY 或 OPENAI_API_KEY 后重启。"
-        )
+        print("LLM mode: OpenAI-compatible —— Agent 会现场生成回复、主动评价你。")
 
     try:
         server.serve_forever()

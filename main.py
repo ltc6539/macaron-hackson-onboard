@@ -2,14 +2,13 @@
 Onboarding Agent - 可运行的交互式 demo
 
 运行方式:
-  1. 无 LLM 模式（纯规则 + 模板）:
-     python main.py
-
-  2. 接入 OpenAI 兼容 API:
+  1. 接入 OpenAI 兼容 API:
      OPENAI_API_KEY=xxx OPENAI_BASE_URL=xxx python main.py --llm openai
 
-  3. 接入 Anthropic API:
+  2. 接入 Anthropic API:
      ANTHROPIC_API_KEY=xxx python main.py --llm anthropic
+
+注意：当前项目只支持 LLM mode；未配置可用 provider 时会直接报错退出。
 """
 
 import asyncio
@@ -22,6 +21,50 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from agent.conversation_manager import ConversationManager
+
+
+def load_local_env(env_name: str = ".env"):
+    """从项目根目录加载 .env，并让项目本地配置优先。"""
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), env_name)
+    if not os.path.exists(env_path):
+        return
+
+    with open(env_path, "r", encoding="utf-8") as f:
+        for raw_line in f:
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key:
+                os.environ[key] = value
+
+
+def resolve_llm_type(cli_choice=None):
+    """解析当前要使用的 LLM provider；未配置时直接报错。"""
+    load_local_env()
+
+    if cli_choice in ("openai", "anthropic"):
+        return cli_choice
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return "anthropic"
+    if os.environ.get("OPENAI_API_KEY"):
+        return "openai"
+    raise ValueError(
+        "未检测到可用的 LLM 配置。请设置 ANTHROPIC_API_KEY 或 OPENAI_API_KEY，"
+        "也可以先复制 .env.example 到 .env。"
+    )
+
+
+def build_llm_client(llm_type: str):
+    if llm_type == "openai":
+        return OpenAIClient()
+    if llm_type == "anthropic":
+        return AnthropicClient()
+    if llm_type is None:
+        return None
+    raise ValueError(f"Unsupported llm_type: {llm_type}")
 
 
 # ============================================================
@@ -197,34 +240,16 @@ def print_debug(manager: ConversationManager):
 # 主交互循环
 # ============================================================
 
-def _resolve_llm_type(cli_choice):
-    """未显式传 --llm 时按环境变量自动选；传 none 强制模板。"""
-    if cli_choice == "none":
-        return None
-    if cli_choice in ("openai", "anthropic"):
-        return cli_choice
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        return "anthropic"
-    if os.environ.get("OPENAI_API_KEY"):
-        return "openai"
-    return None
-
 
 async def main(llm_type=None, debug: bool = False):
     """主函数"""
-    llm_type = _resolve_llm_type(llm_type)
+    llm_type = resolve_llm_type(llm_type)
+    llm_client = build_llm_client(llm_type)
 
-    # 初始化 LLM Client
-    llm_client = None
     if llm_type == "openai":
-        llm_client = OpenAIClient()
-        print("🔌 LLM: OpenAI —— 回复由大模型现场生成")
-    elif llm_type == "anthropic":
-        llm_client = AnthropicClient()
-        print("🔌 LLM: Anthropic Claude —— 回复由大模型现场生成")
+        print("🔌 LLM: OpenAI-compatible —— 回复由大模型现场生成")
     else:
-        print("🔌 Template mode —— 回复是硬编码模板，会更像问卷")
-        print("   想要真 Agent 感：设置 ANTHROPIC_API_KEY 或 OPENAI_API_KEY 再跑\n")
+        print("🔌 LLM: Anthropic Claude —— 回复由大模型现场生成")
 
     # 初始化 ConversationManager
     manager = ConversationManager(llm_client=llm_client)
@@ -286,10 +311,13 @@ async def main(llm_type=None, debug: bool = False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Onboarding Agent Demo")
-    parser.add_argument("--llm", choices=["openai", "anthropic", "none"], default=None,
-                        help="LLM provider；留空按环境变量自动启；传 none 强制模板")
+    parser.add_argument("--llm", choices=["openai", "anthropic"], default=None,
+                        help="LLM provider；留空按环境变量自动探测（Anthropic 优先，其次 OpenAI-compatible）")
     parser.add_argument("--debug", action="store_true",
                         help="Show agent internal state after each turn")
     args = parser.parse_args()
 
-    asyncio.run(main(llm_type=args.llm, debug=args.debug))
+    try:
+        asyncio.run(main(llm_type=args.llm, debug=args.debug))
+    except ValueError as exc:
+        raise SystemExit(str(exc))
