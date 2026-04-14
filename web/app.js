@@ -94,7 +94,9 @@ function renderChoices(choices) {
   if (choices.prompt) {
     const hint = document.createElement('p');
     hint.className = 'choice-hint';
-    hint.textContent = choices.kind === 'quiz' ? '点一个选项直接回答：' : '或者点一下就行：';
+    hint.textContent = choices.kind === 'quiz'
+      ? '点一个选项直接回答：'
+      : (choices.kind === 'entry' ? '先选一个开始方式：' : '或者点一下就行：');
     choicePanel.appendChild(hint);
   }
 

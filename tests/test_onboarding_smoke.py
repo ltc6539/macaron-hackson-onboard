@@ -14,6 +14,31 @@ from core.persistence import PersistenceStore
 
 
 class OnboardingSmokeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_greeting_exposes_onboarding_entry(self):
+        manager = ConversationManager()
+
+        greeting = await manager.process_message("你好")
+        self.assertIn("生活搭子", greeting)
+        self.assertIn("先用两个小问题快速了解我", greeting)
+
+        choices = manager.get_pending_choices()
+        self.assertIsNotNone(choices)
+        assert choices is not None
+        self.assertEqual(choices["kind"], "entry")
+        self.assertEqual([o["value"] for o in choices["options"]], ["A", "B"])
+
+    async def test_entry_choice_starts_first_quiz(self):
+        manager = ConversationManager()
+        await manager.process_message("你好")
+
+        quiz = await manager.process_message("A", via_button=True)
+        self.assertIn("A.", quiz)
+        self.assertIn("B.", quiz)
+        choices = manager.get_pending_choices()
+        self.assertIsNotNone(choices)
+        assert choices is not None
+        self.assertEqual(choices["kind"], "quiz")
+
     async def test_quiz_flow_keeps_onboarding_alive(self):
         manager = ConversationManager()
 

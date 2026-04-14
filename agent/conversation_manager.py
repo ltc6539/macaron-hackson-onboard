@@ -161,12 +161,46 @@ class ConversationManager:
         # PHASE 3: DECIDE (决策)
         # ==========================================
 
-        # 特殊处理：第一条消息
-        if self.state.turn_count == 1:
-            action = AgentAction.GIVE_VALUE
-            action_context = {"type": "greeting"}
+        action, action_context, onboarding_entry_mode = self._decide_next_action(choice_result)
+
+        # ==========================================
+        # PHASE 4: ACT (执行)
+        # ==========================================
+
+        exec_result = await self._execute_action(
+            action=action,
+            action_context=action_context,
+            user_message=user_message,
+            quiz_result=quiz_result,
+            choice_result=choice_result,
+            has_task_intent=has_task_intent,
+            task_description=task_description,
+            meta_prefix=meta_prefix,
+            onboarding_entry_mode=onboarding_entry_mode,
+        )
+        response, action = exec_result
+
+        # 更新 Agent 状态
+        self.state.last_action = action
+        # EVALUATE_USER 触发时把"距离上次 evaluate"计数归零，其他时候 +1
+        if action == AgentAction.EVALUATE_USER:
+            self.state.turns_since_last_evaluate = 0
         else:
-            action, action_context = self.action_selector.select_action(self.state)
+            self.state.turns_since_last_evaluate += 1
+        if action in (AgentAction.ASK_PLAYFUL, AgentAction.ASK_DIRECT):
+            self.state.questions_asked += 1
+
+        # 记录 Agent 回复
+        agent_turn = ConversationTurn(
+            role="agent",
+            content=response,
+            action_type=action,
+        )
+        self.state.add_turn(agent_turn)
+
+        return response
+
+    async def process_message_stream(self, user_message: str, via_button: bool = False):
 
         # ==========================================
         # PHASE 4: ACT (执行)
@@ -283,16 +317,13 @@ class ConversationManager:
         self.state.add_turn(user_turn)
 
         # ----- Phase 3 decide -----
-        if self.state.turn_count == 1:
-            action = AgentAction.GIVE_VALUE
-            action_context = {"type": "greeting"}
-        else:
-            action, action_context = self.action_selector.select_action(self.state)
+        action, action_context, onboarding_entry_mode = self._decide_next_action(choice_result)
 
         # ----- Phase 4 act (streaming) -----
         generation_context, effective_action = self._build_generation_context(
             action, action_context, user_message,
             quiz_result, choice_result, has_task_intent, task_description, meta_prefix,
+            onboarding_entry_mode,
         )
 
         chunks = []
@@ -331,11 +362,13 @@ class ConversationManager:
         has_task_intent: bool,
         task_description: str,
         meta_prefix: str = "",
+        onboarding_entry_mode: Optional[str] = None,
     ) -> tuple:
         """执行选定的行动，生成回复。返回 (response_text, effective_action)。"""
         generation_context, effective_action = self._build_generation_context(
             action, action_context, user_message,
             quiz_result, choice_result, has_task_intent, task_description, meta_prefix,
+            onboarding_entry_mode,
         )
         response = await self.response_generator.generate(generation_context)
         return response, effective_action
@@ -350,6 +383,7 @@ class ConversationManager:
         has_task_intent: bool,
         task_description: str,
         meta_prefix: str,
+        onboarding_entry_mode: Optional[str] = None,
     ) -> tuple:
         """从 action + state 组装 generation_context。会 mutate 相关状态
         （_pending_quiz / _pending_choice / asked_choice_keys / asked_question_ids）。
@@ -370,6 +404,7 @@ class ConversationManager:
             "asked_fallback_keys": self.state.asked_fallback_keys,
             # 状态转变元句（若有）：要拼到回复开头
             "meta_prefix": meta_prefix,
+            "onboarding_entry_mode": onboarding_entry_mode,
             "conversation_history": [
                 {"role": t.role, "content": t.content[:200]}
                 for t in self.state.conversation_history[-6:]
@@ -400,6 +435,14 @@ class ConversationManager:
 
         elif action == AgentAction.GIVE_VALUE and action_context.get("type") == "greeting":
             generation_context["is_greeting"] = True
+            entry_choice = self._build_onboarding_entry_choice()
+            self._pending_choice = entry_choice
+            generation_context["entry_choice"] = {
+                "prompt": entry_choice["prompt"],
+                "options": {
+                    key: value["text"] for key, value in entry_choice["options"].items()
+                },
+            }
 
         # 结构化 A/B 选项：
         # - OFFER_CHOICE：不论 LLM 还是模板模式都挂一个 choice，前端才有按钮、signals 才能回写
@@ -410,7 +453,7 @@ class ConversationManager:
             build_choice_for = (AgentAction.OFFER_CHOICE,)
         if (
             action in build_choice_for
-            and action_context.get("type") != "greeting"
+            and action_context.get("type") not in ("greeting", "task_kickoff")
             and not has_task_intent
             and not self.state.active_task
             and self.state.profiling_mode == ProfilingMode.ACTIVE
@@ -434,7 +477,7 @@ class ConversationManager:
         # 如果 quiz_result / choice_result 有内容，加入上下文
         if quiz_result:
             generation_context["quiz_response_text"] = quiz_result.get("agent_response", "")
-        elif choice_result:
+        elif choice_result and not choice_result.get("entry_action"):
             generation_context["quiz_response_text"] = choice_result.get("agent_response", "")
 
         # 如果用户有任务意图，优先处理任务
@@ -444,6 +487,41 @@ class ConversationManager:
             generation_context["task_description"] = task_description
 
         return generation_context, action
+
+    def _decide_next_action(self, choice_result: Optional[dict]) -> tuple:
+        """决定本轮 action；入口按钮可覆盖常规策略。"""
+        if self.state.turn_count == 1:
+            return AgentAction.GIVE_VALUE, {"type": "greeting"}, None
+
+        if choice_result and choice_result.get("entry_action") == "start_quiz":
+            quiz = self.action_selector._select_quiz(self.state)
+            if quiz:
+                return AgentAction.ASK_PLAYFUL, {"quiz": quiz}, "start_quiz"
+            return AgentAction.GIVE_VALUE, {"type": "task_kickoff"}, "start_quiz"
+
+        if choice_result and choice_result.get("entry_action") == "start_task":
+            self.set_profiling_mode(ProfilingMode.PASSIVE)
+            return AgentAction.GIVE_VALUE, {"type": "task_kickoff"}, "start_task"
+
+        action, action_context = self.action_selector.select_action(self.state)
+        return action, action_context, None
+
+    def _build_onboarding_entry_choice(self) -> dict:
+        """首次欢迎后的明确入口：先 onboarding，或先办事。"""
+        return {
+            "kind": "entry",
+            "prompt": "我们先怎么开始？",
+            "options": {
+                "A": {
+                    "text": "先用两个小问题快速了解我",
+                    "entry_action": "start_quiz",
+                },
+                "B": {
+                    "text": "直接开始，我先说现在的需求",
+                    "entry_action": "start_task",
+                },
+            },
+        }
 
     def _compute_meta_prefix(self, current_user_state) -> str:
         """
@@ -605,6 +683,12 @@ class ConversationManager:
                 {"value": key, "label": opt.get("text", "") if isinstance(opt, dict) else str(opt)}
                 for key, opt in c.get("options", {}).items()
             ]
+            if c.get("kind") == "entry":
+                return {
+                    "kind": "entry",
+                    "prompt": c.get("prompt", ""),
+                    "options": base,
+                }
             return {
                 "kind": "choice",
                 "prompt": c.get("prompt", ""),
@@ -803,10 +887,16 @@ class ConversationManager:
             matched_option = msg
 
         if matched_option is None:
-            number_map = {"1": "A", "一": "A", "第一": "A", "2": "B", "二": "B", "第二": "B"}
-            for token, option in number_map.items():
-                if token in user_message:
-                    matched_option = option
+            option_keys = list(choice.get("options", {}).keys())
+            number_map = {
+                "1": 0, "一": 0, "第一": 0,
+                "2": 1, "二": 1, "第二": 1,
+                "3": 2, "三": 2, "第三": 2,
+                "4": 3, "四": 3, "第四": 3,
+            }
+            for token, idx in number_map.items():
+                if token in user_message and idx < len(option_keys):
+                    matched_option = option_keys[idx]
                     break
 
         if matched_option is None:
@@ -831,6 +921,7 @@ class ConversationManager:
             "selected_option": matched_option,
             "signals": option_data.get("signals", {}),
             "agent_response": option_data.get("agent_response", ""),
+            "entry_action": option_data.get("entry_action"),
         }
 
     def _resolve_task_context(

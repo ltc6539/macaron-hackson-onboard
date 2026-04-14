@@ -91,7 +91,7 @@ Important: live sessions are in-memory only (`SessionStore.sessions`). DB persis
   - `control_flow`
 
 ## BEHAVIORAL RULES THAT MATTER
-- First turn is always treated as a greeting path (`AgentAction.GIVE_VALUE` with greeting context).
+- First turn is always treated as a greeting path (`AgentAction.GIVE_VALUE` with greeting context), and now mounts an explicit onboarding entry choice (`A` = quick onboarding, `B` = direct start).
 - `ActionSelector` never allows consecutive `ask_*` actions.
 - If profile mean confidence is high enough, or question budget is exhausted, active questioning is suppressed.
 - `profiling_mode != ACTIVE` blocks `ASK_PLAYFUL`, `ASK_DIRECT`, and `OFFER_CHOICE` entirely.

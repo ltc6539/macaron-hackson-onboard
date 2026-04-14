@@ -139,6 +139,7 @@ Web 版不是静态页面，而是一个完整的本地 demo：
 - 后端为用户生成匿名 `user_id`
 - 浏览器通过 `macaron_uid` cookie 维持身份
 - 每次点“重开”都会新建一个 session
+- 第一条欢迎语会直接给出 onboarding 入口：`先用两个小问题快速了解我` 或 `直接开始，我先说现在的需求`
 - 聊天回复优先走 SSE 流式接口，失败时回退到普通 JSON 接口
 - 右侧画像卡实时展示五维信号、soft/hard archetype、以及 `Macaron promises`
 

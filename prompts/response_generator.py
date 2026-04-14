@@ -220,17 +220,17 @@ FINAL_SILENCE_POOL = [
 GREETING_INSTRUCTIONS = """你的行动：首次见面打招呼
 
 这是你们的第一次对话。你需要：
-1. 简短有趣地自我介绍（你是谁、你能做什么——用大白话）
-2. 给用户一个轻松的入口选择：
-   - 可以直接开始用（"你现在想吃点什么？"）
-   - 可以先做个小测试让你更了解他（"花两分钟做个小测试？"）
-   - 可以先了解你能做什么（"想先看看我能帮你什么？"）
+1. 简短介绍你是谁，以及你会怎么帮用户
+2. 明确告诉用户：你们会先用两个超短问题摸一下他的风格，这样后面建议会更贴
+3. 给用户一个明确的入口选择：
+   - 先进入 onboarding
+   - 或者直接开始说需求
 
-不要列出功能清单。用一两句话概括你的能力就好。
+不要铺太多背景，不要列功能清单。
 语气是轻松的朋友，不是产品说明书。
 
-注意：这三个选项不要用 1/2/3 或 A/B/C 的格式列出来，
-而是自然地在一段话里融入这几个方向，让用户觉得怎么回复都行。"""
+注意：系统会在 UI 里展示结构化按钮，所以你的回复里要自然地引出这两个入口，
+并和按钮文案保持一致。"""
 
 
 class ResponseGenerator:
@@ -310,6 +310,19 @@ class ResponseGenerator:
             for h in history[-4:]
         ) or "(第一轮对话)"
 
+        entry_choice = context.get("entry_choice") or {}
+        if context.get("is_greeting") and entry_choice:
+            options_text = "\n".join(
+                f"{key}. {value}"
+                for key, value in (entry_choice.get("options") or {}).items()
+            )
+            action_instructions += (
+                "\n\n系统已经为首轮准备了 onboarding 入口按钮，请在回复里明确带出下面这组选项："
+                f"\n{entry_choice.get('prompt', '')}"
+                f"\n{options_text}"
+                "\n规则：保留 A/B 结构；先说明为什么先做两个小问题，再给用户选择。"
+            )
+
         # 状态转变元句（一次性）：要求 LLM 把这句话的意思放在回复开头
         meta_prefix = (context.get("meta_prefix") or "").strip()
         if meta_prefix:
@@ -340,6 +353,12 @@ class ResponseGenerator:
                 parts.append("请用这个回应作为灵感，用你自己的话回复用户，并自然接上下一题，让对话一环扣一环。")
             else:
                 parts.append("请用这个回应作为灵感，用你自己的话回复用户。回复完 quiz 反馈后，自然过渡到一个非常好接的话头。")
+
+        entry_mode = context.get("onboarding_entry_mode")
+        if entry_mode == "start_quiz":
+            parts.append("\n（用户刚在入口选择了先做两个超短问题。不要重复解释流程，直接自然进入第一题。）")
+        elif entry_mode == "start_task":
+            parts.append("\n（用户刚在入口选择了直接开始。不要出题；请用 1-2 句话邀请他直接说当前想解决的事，并说明你会边帮边了解他。）")
 
         # 如果用户有任务意图或正在延续一个任务
         if context.get("task_intent") or context.get("active_task"):
@@ -427,8 +446,10 @@ class ResponseGenerator:
         if context.get("is_greeting"):
             return (
                 "嘿！我是你的生活搭子 🙌\n"
-                "我能帮你找好吃的、订位、做饭、安排周末——基本上跟「吃喝玩乐」有关的我都管。\n"
-                "你可以直接告诉我你想吃什么，或者花两分钟做个小测试让我更快了解你——随你。"
+                "我会先用两个超短问题摸一下你的风格，这样后面不管你是要找东西、做决定，还是安排事情，我都会更贴你。\n\n"
+                "我们先怎么开始？\n"
+                "A. 先用两个小问题快速了解我\n"
+                "B. 直接开始，我先说现在的需求"
             )
 
         # ---- Quiz response (刚回答了一道题) ----
@@ -470,6 +491,9 @@ class ResponseGenerator:
         # ---- Show archetype ----
         if action == "show_archetype":
             return self._render_archetype(context)
+
+        if context.get("onboarding_entry_mode") == "start_task":
+            return "好，那我们直接开始。你现在想解决什么，直接说，我边帮你边继续了解你。"
 
         # ---- Task-oriented response ----
         if user_state == "task_oriented" or context.get("task_intent") or context.get("active_task"):
