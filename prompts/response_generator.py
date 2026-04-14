@@ -359,6 +359,8 @@ class ResponseGenerator:
             parts.append("\n（用户刚在入口选择了先做两个超短问题。不要重复解释流程，直接自然进入第一题。）")
         elif entry_mode == "start_task":
             parts.append("\n（用户刚在入口选择了直接开始。不要出题；请用 1-2 句话邀请他直接说当前想解决的事，并说明你会边帮边了解他。）")
+        elif entry_mode == "onboarding_reveal":
+            parts.append("\n（你现在要结束 onboarding，直接给出第一版画像卡。语气像‘先给你一个初版判断’，不要再回到闲聊或继续追问。）")
 
         # 如果用户有任务意图或正在延续一个任务
         if context.get("task_intent") or context.get("active_task"):

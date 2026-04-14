@@ -161,7 +161,11 @@ class ConversationManager:
         # PHASE 3: DECIDE (决策)
         # ==========================================
 
-        action, action_context, onboarding_entry_mode = self._decide_next_action(choice_result)
+        action, action_context, onboarding_entry_mode = self._decide_next_action(
+            quiz_result=quiz_result,
+            choice_result=choice_result,
+            has_task_intent=has_task_intent,
+        )
 
         # ==========================================
         # PHASE 4: ACT (执行)
@@ -317,7 +321,11 @@ class ConversationManager:
         self.state.add_turn(user_turn)
 
         # ----- Phase 3 decide -----
-        action, action_context, onboarding_entry_mode = self._decide_next_action(choice_result)
+        action, action_context, onboarding_entry_mode = self._decide_next_action(
+            quiz_result=quiz_result,
+            choice_result=choice_result,
+            has_task_intent=has_task_intent,
+        )
 
         # ----- Phase 4 act (streaming) -----
         generation_context, effective_action = self._build_generation_context(
@@ -488,23 +496,67 @@ class ConversationManager:
 
         return generation_context, action
 
-    def _decide_next_action(self, choice_result: Optional[dict]) -> tuple:
-        """决定本轮 action；入口按钮可覆盖常规策略。"""
+    def _decide_next_action(
+        self,
+        quiz_result: Optional[dict],
+        choice_result: Optional[dict],
+        has_task_intent: bool,
+    ) -> tuple:
+        """决定本轮 action；入口按钮和 onboarding flow 可覆盖常规策略。"""
         if self.state.turn_count == 1:
             return AgentAction.GIVE_VALUE, {"type": "greeting"}, None
 
         if choice_result and choice_result.get("entry_action") == "start_quiz":
+            self.state.onboarding_session_active = True
+            self.state.onboarding_questions_answered = 0
             quiz = self.action_selector._select_quiz(self.state)
             if quiz:
                 return AgentAction.ASK_PLAYFUL, {"quiz": quiz}, "start_quiz"
-            return AgentAction.GIVE_VALUE, {"type": "task_kickoff"}, "start_quiz"
+            self.state.onboarding_session_active = False
+            return AgentAction.SHOW_ARCHETYPE, {"type": "onboarding_reveal"}, "onboarding_reveal"
 
         if choice_result and choice_result.get("entry_action") == "start_task":
+            self.state.onboarding_session_active = False
+            self.state.onboarding_questions_answered = 0
             self.set_profiling_mode(ProfilingMode.PASSIVE)
             return AgentAction.GIVE_VALUE, {"type": "task_kickoff"}, "start_task"
 
+        if self.state.onboarding_session_active:
+            if has_task_intent:
+                self.state.onboarding_session_active = False
+                self.set_profiling_mode(ProfilingMode.PASSIVE)
+                return AgentAction.GIVE_VALUE, {"type": "task_kickoff"}, "start_task"
+
+            if quiz_result and not quiz_result.get("is_meh"):
+                self.state.onboarding_questions_answered += 1
+
+            if self._should_finish_onboarding_flow():
+                self.state.onboarding_session_active = False
+                return AgentAction.SHOW_ARCHETYPE, {"type": "onboarding_reveal"}, "onboarding_reveal"
+
+            if self.state.profiling_mode == ProfilingMode.ACTIVE:
+                quiz = self.action_selector._select_quiz(self.state)
+                if quiz:
+                    return AgentAction.ASK_PLAYFUL, {"quiz": quiz}, "continue_onboarding"
+
+            self.state.onboarding_session_active = False
+            return AgentAction.SHOW_ARCHETYPE, {"type": "onboarding_reveal"}, "onboarding_reveal"
+
         action, action_context = self.action_selector.select_action(self.state)
         return action, action_context, None
+
+    def _should_finish_onboarding_flow(self) -> bool:
+        """onboarding-first 入口下，2-3 题内给出第一版卡。"""
+        answered = self.state.onboarding_questions_answered
+        if answered >= self.state.onboarding_questions_target:
+            return True
+        if answered < 2:
+            return False
+        if self.state.profile.confident_dimensions_count(threshold=0.25) >= 2:
+            return True
+        if self.state.profile.mean_confidence() >= 0.22:
+            return True
+        return False
 
     def _build_onboarding_entry_choice(self) -> dict:
         """首次欢迎后的明确入口：先 onboarding，或先办事。"""
@@ -995,6 +1047,8 @@ class ConversationManager:
             "profiling_mode": self.state.profiling_mode.value,
             "turn_count": self.state.turn_count,
             "questions_asked": self.state.questions_asked,
+            "onboarding_session_active": self.state.onboarding_session_active,
+            "onboarding_questions_answered": self.state.onboarding_questions_answered,
             "last_action": self.state.last_action.value if self.state.last_action else None,
             "onboarding_complete": self.state.onboarding_complete,
             "archetype_revealed": self.state.archetype_revealed,

@@ -55,6 +55,29 @@ class OnboardingSmokeTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreater(manager.state.rapport, 0.3)
         self.assertGreater(manager.state.profile.control_flow.confidence, 0.0)
 
+    async def test_onboarding_entry_locks_into_2_to_3_questions_then_card(self):
+        manager = ConversationManager()
+        await manager.process_message("你好")
+
+        first_quiz = await manager.process_message("A", via_button=True)
+        self.assertEqual(manager.state.last_action, AgentAction.ASK_PLAYFUL)
+        self.assertTrue(manager.state.onboarding_session_active)
+        self.assertIn("A.", first_quiz)
+
+        second_quiz = await manager.process_message("B", via_button=True)
+        self.assertEqual(manager.state.last_action, AgentAction.ASK_PLAYFUL)
+        self.assertTrue(manager.state.onboarding_session_active)
+        self.assertIn("A.", second_quiz)
+
+        card = await manager.process_message("B", via_button=True)
+        self.assertEqual(manager.state.last_action, AgentAction.SHOW_ARCHETYPE)
+        self.assertTrue(manager.state.archetype_revealed)
+        self.assertFalse(manager.state.onboarding_session_active)
+        self.assertTrue(
+            "你是" in card or "我看出来了" in card or "画像" in card,
+            f"期望第三步直接出第一版卡，实际：{card[:80]}",
+        )
+
     async def test_task_request_gets_task_style_response(self):
         manager = ConversationManager()
         await manager.process_message("你好")

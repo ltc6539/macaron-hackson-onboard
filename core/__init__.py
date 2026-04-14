@@ -148,6 +148,9 @@ class AgentState:
     last_meta_prefix: Optional[str] = None
     conversation_history: list[ConversationTurn] = field(default_factory=list)
     onboarding_complete: bool = False
+    onboarding_session_active: bool = False
+    onboarding_questions_answered: int = 0
+    onboarding_questions_target: int = 3
     archetype_revealed: bool = False
     active_task: Optional[str] = None
     profiling_mode: ProfilingMode = ProfilingMode.ACTIVE
