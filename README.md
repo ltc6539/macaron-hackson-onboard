@@ -82,6 +82,15 @@ python3 -m pip install pyyaml
 python3 -m pip install openai anthropic
 ```
 
+项目里提供了 `.env.example`，推荐先复制一份本地配置：
+
+```bash
+cp .env.example .env
+set -a; source .env; set +a
+```
+
+注意：当前代码是直接读取环境变量，并不会自动加载 `.env`。
+
 ### 跑 CLI demo
 
 ```bash
