@@ -150,7 +150,7 @@ class AgentState:
     onboarding_complete: bool = False
     onboarding_session_active: bool = False
     onboarding_questions_answered: int = 0
-    onboarding_questions_target: int = 3
+    onboarding_questions_target: int = 4
     archetype_revealed: bool = False
     active_task: Optional[str] = None
     profiling_mode: ProfilingMode = ProfilingMode.ACTIVE

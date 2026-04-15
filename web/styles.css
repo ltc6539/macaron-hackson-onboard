@@ -652,6 +652,15 @@ h2 {
   stroke: var(--teal);
 }
 
+.archetype-card.chat-surface {
+  background: rgba(255, 251, 245, 0.96);
+  box-shadow: 0 18px 40px rgba(19, 33, 31, 0.08);
+}
+
+.chat-log .archetype-card.chat-surface {
+  padding: 20px;
+}
+
 .soft-hint {
   margin-top: 10px;
   font-size: 0.88rem;
@@ -694,6 +703,23 @@ h2 {
   background: linear-gradient(135deg, var(--teal), #1b5b55);
   color: white;
   border-bottom-right-radius: 8px;
+}
+
+.bubble.bubble-card {
+  max-width: min(100%, 760px);
+  padding: 12px;
+}
+
+.bubble.bubble-card .bubble-role {
+  margin: 0 0 10px;
+}
+
+.bubble.bubble-card .bubble-body {
+  line-height: 1.5;
+}
+
+.bubble.bubble-card .archetype-card {
+  margin-top: 0;
 }
 
 .bubble.typing {

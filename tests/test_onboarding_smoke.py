@@ -46,16 +46,23 @@ class OnboardingSmokeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("生活搭子", greeting)
 
         quiz = await manager.process_message("来个测试")
-        self.assertIn("想象一下", quiz)
+        self.assertIn("A.", quiz)
+        self.assertIn("B.", quiz)
 
         feedback = await manager.process_message("B")
-        self.assertIn("掌控全局型选手", feedback)
         self.assertIn("A.", feedback)
         self.assertIn("B.", feedback)
         self.assertGreater(manager.state.rapport, 0.3)
-        self.assertGreater(manager.state.profile.control_flow.confidence, 0.0)
+        any_dim_confident = any(
+            getattr(manager.state.profile, dim).confidence > 0.0
+            for dim in (
+                "novelty_appetite", "control_flow", "decision_tempo",
+                "social_energy", "sensory_cerebral",
+            )
+        )
+        self.assertTrue(any_dim_confident, "quiz B 应至少推高一个维度的 confidence")
 
-    async def test_onboarding_entry_locks_into_2_to_3_questions_then_card(self):
+    async def test_onboarding_entry_locks_into_four_questions_then_card(self):
         manager = ConversationManager()
         await manager.process_message("你好")
 
@@ -69,13 +76,24 @@ class OnboardingSmokeTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(manager.state.onboarding_session_active)
         self.assertIn("A.", second_quiz)
 
+        third_quiz = await manager.process_message("B", via_button=True)
+        self.assertEqual(manager.state.last_action, AgentAction.ASK_PLAYFUL)
+        self.assertTrue(manager.state.onboarding_session_active)
+        self.assertIn("A.", third_quiz)
+
+        fourth_quiz = await manager.process_message("B", via_button=True)
+        self.assertEqual(manager.state.last_action, AgentAction.ASK_PLAYFUL)
+        self.assertTrue(manager.state.onboarding_session_active)
+        self.assertIn("A.", fourth_quiz)
+
         card = await manager.process_message("B", via_button=True)
         self.assertEqual(manager.state.last_action, AgentAction.SHOW_ARCHETYPE)
         self.assertTrue(manager.state.archetype_revealed)
         self.assertFalse(manager.state.onboarding_session_active)
+        self.assertEqual(manager.state.onboarding_questions_answered, 4)
         self.assertTrue(
             "你是" in card or "我看出来了" in card or "画像" in card,
-            f"期望第三步直接出第一版卡，实际：{card[:80]}",
+            f"期望第四题后直接出第一版卡，实际：{card[:80]}",
         )
 
     async def test_task_request_gets_task_style_response(self):
@@ -145,6 +163,30 @@ class OnboardingSmokeTests(unittest.IsolatedAsyncioTestCase):
         values = [o["value"] for o in choices["options"]]
         self.assertIn("A", values)
         self.assertIn("B", values)
+
+    async def test_stream_retry_falls_back_to_non_stream_once(self):
+        manager = ConversationManager()
+
+        async def broken_stream(_context):
+            yield "半截"
+            raise RuntimeError("stream broken")
+
+        async def fallback_generate(_context):
+            return "完整回复"
+
+        manager.response_generator.generate_stream = broken_stream
+        manager.response_generator.generate = fallback_generate
+
+        events = []
+        async for event in manager.process_message_stream("你好"):
+            events.append(event)
+
+        self.assertEqual(events[0]["type"], "chunk")
+        self.assertEqual(events[0]["text"], "半截")
+        self.assertEqual(events[-1]["type"], "done")
+        self.assertEqual(events[-1]["reply"], "完整回复")
+        self.assertEqual(manager.state.last_action, AgentAction.GIVE_VALUE)
+        self.assertEqual(manager.state.conversation_history[-1].content, "完整回复")
 
     async def test_dan_ren_archetype_on_skip_and_short_msgs(self):
         manager = ConversationManager()

@@ -335,12 +335,15 @@ class ConversationManager:
         )
 
         chunks = []
-        # 模板模式下 meta_prefix 是拼在回复前的；LLM 模式下它已经进 system prompt
-        # 让 generate_stream 自己处理，这里不要特殊处理
-        async for chunk in self.response_generator.generate_stream(generation_context):
-            chunks.append(chunk)
-            yield {"type": "chunk", "text": chunk}
-        full_response = "".join(chunks)
+        # 先尝试流式；如果上游在中途断流，就在同一轮里回退到非流式重试，
+        # 这样不会重复处理用户消息，也更容易把最终画像卡补出来。
+        try:
+            async for chunk in self.response_generator.generate_stream(generation_context):
+                chunks.append(chunk)
+                yield {"type": "chunk", "text": chunk}
+            full_response = "".join(chunks)
+        except Exception:
+            full_response = await self.response_generator.generate(generation_context)
 
         # ----- finalize state -----
         self.state.last_action = effective_action
@@ -546,17 +549,9 @@ class ConversationManager:
         return action, action_context, None
 
     def _should_finish_onboarding_flow(self) -> bool:
-        """onboarding-first 入口下，2-3 题内给出第一版卡。"""
+        """onboarding-first 入口下，至少完成 4 题再给第一版卡。"""
         answered = self.state.onboarding_questions_answered
-        if answered >= self.state.onboarding_questions_target:
-            return True
-        if answered < 2:
-            return False
-        if self.state.profile.confident_dimensions_count(threshold=0.25) >= 2:
-            return True
-        if self.state.profile.mean_confidence() >= 0.22:
-            return True
-        return False
+        return answered >= self.state.onboarding_questions_target
 
     def _build_onboarding_entry_choice(self) -> dict:
         """首次欢迎后的明确入口：先 onboarding，或先办事。"""
@@ -569,7 +564,7 @@ class ConversationManager:
                     "entry_action": "start_quiz",
                 },
                 "B": {
-                    "text": "直接开始，我先说现在的需求",
+                    "text": "先干活，画像慢慢来",
                     "entry_action": "start_task",
                 },
             },
@@ -824,15 +819,15 @@ class ConversationManager:
         choice_bank = {
             "novelty_appetite": {
                 "key": "choice_novelty_v1",
-                "prompt": "我先收一个特别好回的小偏好：你这类选择通常更偏哪边？",
+                "prompt": "周末要约朋友吃饭，你翻出收藏夹——",
                 "options": {
                     "A": {
-                        "text": "熟悉的老地方，更稳",
+                        "text": "点开那家去过 3 次的老地方",
                         "signals": {"novelty_appetite": {"value": -0.35, "confidence": 0.18}},
                         "agent_response": "懂，你更吃确定感那一边。",
                     },
                     "B": {
-                        "text": "没去过的新店，更有新鲜感",
+                        "text": "滑过它，去看最近加进来的那几家新店",
                         "signals": {"novelty_appetite": {"value": 0.35, "confidence": 0.18}},
                         "agent_response": "懂，你对新鲜感是有点 appetite 的。",
                     },
@@ -840,15 +835,15 @@ class ConversationManager:
             },
             "decision_tempo": {
                 "key": "choice_tempo_v1",
-                "prompt": "再来一个超简单的：你做决定通常更像哪种？",
+                "prompt": "菜单递上来那一刻——",
                 "options": {
                     "A": {
-                        "text": "差不多就定，先吃上再说",
+                        "text": "前两页就锁定了，先吃上再说",
                         "signals": {"decision_tempo": {"value": 0.3, "confidence": 0.18}},
                         "agent_response": "好，快决策型，我记住了。",
                     },
                     "B": {
-                        "text": "先比一轮，心里更踏实",
+                        "text": "一页一页翻到最后，先比完再决定",
                         "signals": {"decision_tempo": {"value": -0.3, "confidence": 0.18}},
                         "agent_response": "好，你会先过一轮脑子再下决定。",
                     },
@@ -856,15 +851,15 @@ class ConversationManager:
             },
             "social_energy": {
                 "key": "choice_social_v1",
-                "prompt": "这个也很快：你更常在哪种场景下吃得开心？",
+                "prompt": "理想中的\"好好吃一顿\"画面里——",
                 "options": {
                     "A": {
-                        "text": "一个人吃，安静一点更舒服",
+                        "text": "一个人戴着耳机慢慢吃",
                         "signals": {"social_energy": {"value": -0.3, "confidence": 0.16}},
                         "agent_response": "收到，你更像是安静充电型。",
                     },
                     "B": {
-                        "text": "跟朋友一起，热闹一点更带劲",
+                        "text": "一桌朋友边吵边夹菜",
                         "signals": {"social_energy": {"value": 0.3, "confidence": 0.16}},
                         "agent_response": "收到，你更容易在热闹里来电。",
                     },
@@ -872,15 +867,15 @@ class ConversationManager:
             },
             "sensory_cerebral": {
                 "key": "choice_sensory_v1",
-                "prompt": "选店的时候，你通常会先抓哪种信息？",
+                "prompt": "挑店的 30 秒里你先盯哪个——",
                 "options": {
                     "A": {
-                        "text": "氛围和感觉，对味最重要",
+                        "text": "门头照片和菜品图，氛围对不对",
                         "signals": {"sensory_cerebral": {"value": 0.3, "confidence": 0.18}},
                         "agent_response": "懂，你是先看感觉的那种。",
                     },
                     "B": {
-                        "text": "评分和数据，先确认不踩雷",
+                        "text": "评分和人均，先确认不踩雷",
                         "signals": {"sensory_cerebral": {"value": -0.3, "confidence": 0.18}},
                         "agent_response": "懂，你会先拿事实做锚点。",
                     },
@@ -888,17 +883,17 @@ class ConversationManager:
             },
             "control_flow": {
                 "key": "choice_control_v1",
-                "prompt": "最后这个特别直白：你更喜欢哪种节奏？",
+                "prompt": "周末前一晚，你更踏实的状态是——",
                 "options": {
                     "A": {
-                        "text": "你直接给我一个首选，省心",
-                        "signals": {"control_flow": {"value": -0.35, "confidence": 0.18}},
-                        "agent_response": "好，你不想把精力花在选择本身。",
-                    },
-                    "B": {
-                        "text": "你先给我选项，我自己拍板",
+                        "text": "已经订好明天几点去哪，省心",
                         "signals": {"control_flow": {"value": 0.35, "confidence": 0.18}},
                         "agent_response": "好，你还是喜欢自己掌舵。",
+                    },
+                    "B": {
+                        "text": "明天起床再看心情，不想提前被排满",
+                        "signals": {"control_flow": {"value": -0.35, "confidence": 0.18}},
+                        "agent_response": "好，你不想把精力花在提前规划上。",
                     },
                 },
             },
@@ -953,8 +948,9 @@ class ConversationManager:
 
         if matched_option is None:
             keyword_hints = [
-                "老地方", "新店", "先吃", "先比", "一个人", "朋友",
-                "氛围", "评分", "直接", "自己", "拍板", "省心",
+                "老地方", "新店", "先吃", "先比", "锁定",
+                "一个人", "朋友", "氛围", "评分",
+                "省心", "看心情", "起床",
             ]
             for key, option in choice.get("options", {}).items():
                 option_text = option.get("text", "")

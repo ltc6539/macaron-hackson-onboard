@@ -27,6 +27,7 @@ const ROSE_DIMS = [
 let sessionId = null;
 let nickname = '';
 let pendingBubble = null;
+let lastChatCardSignature = null;
 
 function escapeHtml(text) {
   return String(text)
@@ -47,6 +48,18 @@ function appendBubble(role, text) {
   bubble.classList.add(role);
   fragment.querySelector('.bubble-role').textContent = role === 'agent' ? 'Agent' : (nickname || 'You');
   fragment.querySelector('.bubble-body').innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+  chatLog.appendChild(fragment);
+  chatLog.scrollTop = chatLog.scrollHeight;
+  return bubble;
+}
+
+function appendHtmlBubble(role, label, html, extraClass = '') {
+  const fragment = bubbleTemplate.content.cloneNode(true);
+  const bubble = fragment.querySelector('.bubble');
+  bubble.classList.add(role);
+  if (extraClass) bubble.classList.add(extraClass);
+  fragment.querySelector('.bubble-role').textContent = label;
+  fragment.querySelector('.bubble-body').innerHTML = html;
   chatLog.appendChild(fragment);
   chatLog.scrollTop = chatLog.scrollHeight;
   return bubble;
@@ -219,23 +232,17 @@ function buildTraitLines(dimensions) {
 // Archetype 卡片（升级版）
 // ============================================================
 
-function renderPortrait(state) {
+function buildPortraitCardMarkup(state, opts = {}) {
   const archetype = (state && state.archetype) || null;
   const dimensions = (state && state.profile && state.profile.dimensions) || {};
   const rose = buildRoseChartSvg(dimensions);
   const traits = buildTraitLines(dimensions);
-  const nickPrefix = nickname ? `${escapeHtml(nickname)}，` : '';
+  const showNickname = opts.showNickname !== false;
+  const chatMode = !!opts.chatMode;
+  const nickPrefix = showNickname && nickname ? `${escapeHtml(nickname)}，` : '';
 
   const fallback = !archetype || !!archetype.is_fallback;
   const softMatch = !fallback && !!archetype.soft_match;
-
-  // reveal 按钮：archetype 存在（哪怕 fallback 也能点看当前快照）
-  if (revealButton) {
-    revealButton.disabled = !archetype;
-    if (archetype) revealButton.classList.add('is-ready');
-    else revealButton.classList.remove('is-ready');
-  }
-
   const promises = (state && state.macaron_promises) || [];
   const promisesHtml = promises.length
     ? `
@@ -266,8 +273,9 @@ function renderPortrait(state) {
         : '');
 
   const cardClass = fallback ? 'fallback' : (softMatch ? 'soft' : 'match');
-  portraitContent.innerHTML = `
-    <article class="archetype-card ${cardClass}">
+  const chatClass = chatMode ? ' chat-surface' : '';
+  return `
+    <article class="archetype-card ${cardClass}${chatClass}">
       <div class="archetype-header">${headerLine}</div>
       <div class="rose-wrap">${rose}</div>
       <ul class="traits-list">${traits}</ul>
@@ -279,6 +287,38 @@ function renderPortrait(state) {
   `;
 }
 
+function getArchetypeCardSignature(state) {
+  if (!state || !state.archetype_revealed || !state.archetype) return null;
+  const archetype = state.archetype || {};
+  const promises = (state.macaron_promises || []).join('|');
+  return [
+    archetype.key || 'unknown',
+    archetype.soft_match ? 'soft' : 'full',
+    archetype.is_fallback ? 'fallback' : 'match',
+    promises,
+  ].join('::');
+}
+
+function maybeAppendArchetypeCardBubble(state) {
+  const signature = getArchetypeCardSignature(state);
+  if (!signature || signature === lastChatCardSignature) return;
+  lastChatCardSignature = signature;
+  appendHtmlBubble('agent', '画像卡', buildPortraitCardMarkup(state, { chatMode: true } ), 'bubble-card');
+}
+
+function renderPortrait(state) {
+  const archetype = (state && state.archetype) || null;
+
+  // reveal 按钮：archetype 存在（哪怕 fallback 也能点看当前快照）
+  if (revealButton) {
+    revealButton.disabled = !archetype;
+    if (archetype) revealButton.classList.add('is-ready');
+    else revealButton.classList.remove('is-ready');
+  }
+
+  portraitContent.innerHTML = buildPortraitCardMarkup(state);
+}
+
 // ============================================================
 // 侧栏 profile 条 + 顶部 chips
 // ============================================================
@@ -287,6 +327,7 @@ function updateState(state) {
   renderPortrait(state);
   renderChoices(state.choices);
   updateSkipVisibility(state);
+  maybeAppendArchetypeCardBubble(state);
 }
 
 // ============================================================
@@ -363,6 +404,7 @@ async function createSession() {
   clearTypingBubble();
   chatLog.innerHTML = '';
   portraitContent.innerHTML = '';
+  lastChatCardSignature = null;
 
   try {
     const response = await fetch('/api/session', {
@@ -429,6 +471,7 @@ async function sendMessage(message, opts = {}) {
   let accumulated = '';
   let finalState = null;
   let firstChunkSeen = false;
+  let recoveredFromFallback = false;
 
   const swapToStreaming = () => {
     if (firstChunkSeen) return;
@@ -444,6 +487,31 @@ async function sendMessage(message, opts = {}) {
     chatLog.scrollTop = chatLog.scrollHeight;
   };
 
+  const fallbackToNonStreaming = async (reason) => {
+    const fallback = await fetch('/api/message', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId, message, via_button: viaButton }),
+    });
+
+    let payload = {};
+    try {
+      payload = await fallback.json();
+    } catch {
+      payload = {};
+    }
+
+    if (!fallback.ok) {
+      throw new Error(payload.error || reason || '流式失败，且非流式补救也失败了');
+    }
+
+    accumulated = payload.reply || accumulated;
+    renderAccumulated();
+    finalState = payload.state || finalState;
+    recoveredFromFallback = true;
+  };
+
   try {
     const response = await fetch('/api/message/stream', {
       method: 'POST',
@@ -453,21 +521,13 @@ async function sendMessage(message, opts = {}) {
     });
 
     if (!response.ok || !response.body) {
-      // 流接不上，降级到非流式端点
-      const fallback = await fetch('/api/message', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId, message, via_button: viaButton }),
-      });
-      const payload = await fallback.json();
-      accumulated = payload.reply || '';
-      renderAccumulated();
-      finalState = payload.state;
+      await fallbackToNonStreaming('流式接口不可用');
     } else {
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
+      let streamError = null;
+
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -492,15 +552,26 @@ async function sendMessage(message, opts = {}) {
             }
             finalState = ev.state;
           } else if (ev.type === 'error') {
-            accumulated += '\n(出错了：' + (ev.message || '') + ')';
-            renderAccumulated();
+            streamError = ev.message || '流式连接中断';
+            break;
           }
         }
+        if (streamError) break;
+      }
+
+      if (streamError && !finalState) {
+        await fallbackToNonStreaming(streamError);
       }
     }
   } catch (err) {
-    accumulated = accumulated || `(流失败: ${err.message || err})`;
-    renderAccumulated();
+    if (!recoveredFromFallback) {
+      try {
+        await fallbackToNonStreaming(err.message || String(err));
+      } catch (fallbackErr) {
+        accumulated = accumulated || `(流失败: ${fallbackErr.message || fallbackErr})`;
+        renderAccumulated();
+      }
+    }
   } finally {
     // 如果整条流什么都没吐（例如远端 500），把 thinking 占位也清掉
     if (!firstChunkSeen) {

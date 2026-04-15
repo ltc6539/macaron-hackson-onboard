@@ -1,6 +1,13 @@
 # 趣味题库
 # 每道题是 ask_playful 动作的"弹药"
 # Agent 根据当前 profile gap 和 user state 选择最合适的题
+#
+# 设计准则（新题必须满足至少 2 条）：
+# 1. 有具体时间/空间锚点（"周五 7:30"、"地铁靠站"）
+# 2. 透露个性而非表达需求（"你会……" 而非 "你想要……"）
+# 3. 4 选而非 2 选
+# 4. 每个 option 的 text 自身有画面
+# 5. agent_response 要让用户觉得"被读懂"，不是复读
 
 questions:
 
@@ -41,73 +48,154 @@ questions:
           novelty_appetite: { value: 0.3, confidence: 0.20 }
           control_flow: { value: 0.2, confidence: 0.15 }
 
-    # Agent 根据用户选择的个性化回应
     agent_responses:
       A: "你是那种靠直觉找路的人——人多的地方就是安全感。以后我给你推荐的时候会留意'人气'这个信号。"
       B: "掌控全局型选手。放心，我以后给你的每个推荐都会带上'为什么推这个'。"
       C: "你骨子里是个冒险家。以后我推荐里永远会藏一个你绝对没见过的选项。"
       D: "社交天赋点满了。你这种人走到哪都能交到朋友——我以后帮你找的地方也会考虑'容不容易跟人聊起来'。"
 
-    # 这道题主要测什么（用于 Agent 选题时判断）
     primary_dimensions: ["novelty_appetite", "control_flow"]
     secondary_dimensions: ["social_energy", "decision_tempo"]
 
-  two_doors:
-    id: "q_two_doors"
+  subway_glance:
+    id: "q_subway_glance"
     tier: 1
     text: |
-      你面前两扇门。
-      左边写着「你会喜欢的」，右边写着「你没试过的」。
-      你开哪扇？
+      地铁靠站，你抬头的瞬间同时看到三种画面闪过。
+      最先让你想多看一眼的是？
     options:
       A:
-        text: "左边——「你会喜欢的」"
+        text: "一个陌生人在笔记本上画一张很复杂的图"
         signals:
-          novelty_appetite: { value: -0.5, confidence: 0.35 }
-          control_flow: { value: 0.2, confidence: 0.15 }
-      B:
-        text: "右边——「你没试过的」"
-        signals:
-          novelty_appetite: { value: 0.5, confidence: 0.35 }
-          control_flow: { value: -0.2, confidence: 0.15 }
-    agent_responses:
-      A: "你知道自己要什么——这其实是一种很稀缺的能力。我会记住你喜欢什么，然后越推越准。"
-      B: "我就知道。那以后我推荐的东西里，一定会混一些你没见过的——惊喜是我的职责。"
-    primary_dimensions: ["novelty_appetite"]
-    secondary_dimensions: ["control_flow"]
-
-  fridge_archaeology:
-    id: "q_fridge"
-    tier: 1
-    text: "如果我现在打开你的冰箱，最可能看到什么？"
-    options:
-      A:
-        text: "整整齐齐的，每样东西都有它的位置"
-        signals:
-          control_flow: { value: 0.6, confidence: 0.30 }
-          sensory_cerebral: { value: -0.2, confidence: 0.10 }
-      B:
-        text: "上周买的菜和上个月的酱料和平共处"
-        signals:
-          control_flow: { value: -0.3, confidence: 0.25 }
-          novelty_appetite: { value: 0.1, confidence: 0.10 }
-      C:
-        text: "基本是空的——外卖才是正义"
-        signals:
-          control_flow: { value: -0.2, confidence: 0.15 }
-          decision_tempo: { value: 0.3, confidence: 0.20 }
-      D:
-        text: "瓶瓶罐罐特别多，调料比食材多"
-        signals:
-          sensory_cerebral: { value: 0.4, confidence: 0.25 }
+          sensory_cerebral: { value: -0.4, confidence: 0.25 }
           novelty_appetite: { value: 0.3, confidence: 0.20 }
+      B:
+        text: "对面姑娘耳机里漏出的半句歌词"
+        signals:
+          sensory_cerebral: { value: 0.5, confidence: 0.30 }
+          social_energy: { value: 0.2, confidence: 0.15 }
+      C:
+        text: "玻璃倒影里自己今天的表情"
+        signals:
+          sensory_cerebral: { value: 0.3, confidence: 0.20 }
+          social_energy: { value: -0.4, confidence: 0.25 }
+      D:
+        text: "窗外楼间一道突然亮起的霓虹"
+        signals:
+          novelty_appetite: { value: 0.5, confidence: 0.30 }
+          sensory_cerebral: { value: 0.3, confidence: 0.15 }
     agent_responses:
-      A: "强迫症冰箱，respect。你的生活一定也安排得井井有条——我以后帮你安排事情会提前量足一点。"
-      B: "真实的生活气息。你是那种'差不多就行'的人，我以后也不会用太多选项烦你。"
-      C: "外卖战士。那我的首要任务就是帮你在外面吃得好、吃得省心。"
-      D: "你是个有料理灵魂的人。以后我可以给你推食谱和食材搭配——你冰箱里那些酱料终于有用武之地了。"
-    primary_dimensions: ["control_flow"]
-    secondary_dimensions: ["sensory_cerebral", "decision_tempo"]
+      A: "你被'别人脑子里的东西'吸引——典型的信息狩猎型。我推荐里会多掺点'他们是怎么想的'这种维度。"
+      B: "你对气味、声音、半截信息敏感。我以后选店会先看这家的'空气'对不对。"
+      C: "很少见的'当下感'——你跟自己相处得挺舒服。我不会用太多选项烦你。"
+      D: "你在找的是那个'意外亮起的瞬间'。我以后藏新东西给你的时候，会确保它真的能让你眼前一亮。"
+    primary_dimensions: ["sensory_cerebral", "novelty_appetite"]
+    secondary_dimensions: ["social_energy"]
+
+  phone_notification:
+    id: "q_phone_notification"
+    tier: 1
+    text: |
+      周四下午，你手机同时弹出四条推送——你会先点哪个？
+    options:
+      A:
+        text: "你关注的那家餐厅刚开放下周预约"
+        signals:
+          novelty_appetite: { value: -0.3, confidence: 0.20 }
+          control_flow: { value: 0.3, confidence: 0.20 }
+          decision_tempo: { value: -0.2, confidence: 0.15 }
+      B:
+        text: "附近 3 公里有家新开的店，算法说你会喜欢"
+        signals:
+          novelty_appetite: { value: 0.5, confidence: 0.30 }
+          decision_tempo: { value: 0.3, confidence: 0.20 }
+      C:
+        text: "老朋友发来：在吗"
+        signals:
+          social_energy: { value: 0.5, confidence: 0.30 }
+          novelty_appetite: { value: -0.1, confidence: 0.10 }
+      D:
+        text: "天气预警：今晚有雷阵雨"
+        signals:
+          sensory_cerebral: { value: -0.3, confidence: 0.20 }
+          control_flow: { value: 0.4, confidence: 0.25 }
+    agent_responses:
+      A: "你心里已经有一份'想去的清单'，等的是时机。我会帮你盯着那些不容易订到的位子。"
+      B: "算法推荐你也乐意点——对新店有好奇但不排斥被引导。我会给你留一个'未被验证过但我觉得你会喜欢'的位置。"
+      C: "人的信号永远优先。我以后找地方的时候也会考虑'这地方适不适合'在吗'的朋友'。"
+      D: "你对环境变化敏感，是会提前收衣服的人。那我也会把'天气 + 出行 + 吃饭'串起来看。"
+    primary_dimensions: ["novelty_appetite", "social_energy"]
+    secondary_dimensions: ["decision_tempo", "control_flow"]
+
+  friday_730pm:
+    id: "q_macaron_friday"
+    tier: 1
+    text: |
+      周五 7:30，你关掉电脑坐在椅子上。
+      接下来 15 分钟你大概率在——
+    options:
+      A:
+        text: "刷手机找一家必定不会出错的店"
+        signals:
+          novelty_appetite: { value: -0.4, confidence: 0.25 }
+          decision_tempo: { value: 0.2, confidence: 0.15 }
+      B:
+        text: "翻收藏夹里那家想去很久没去的"
+        signals:
+          novelty_appetite: { value: 0.3, confidence: 0.20 }
+          control_flow: { value: 0.3, confidence: 0.20 }
+      C:
+        text: "先躺 10 分钟再说"
+        signals:
+          decision_tempo: { value: -0.4, confidence: 0.25 }
+          control_flow: { value: -0.4, confidence: 0.25 }
+      D:
+        text: "问群里有没有人一起"
+        signals:
+          social_energy: { value: 0.5, confidence: 0.30 }
+          decision_tempo: { value: 0.2, confidence: 0.15 }
+    agent_responses:
+      A: "周五不想冒险——我懂。你那份'不会出错的店'清单，以后我帮你维护。"
+      B: "有'积攒'型的愿望清单。那我以后会在周五主动推你收藏里还没去的那家。"
+      C: "这种状态我懂。15 分钟后我再问你饿不饿，不吵你。"
+      D: "周五的你想要人味儿。我可以帮你在群里直接扔一张'这家人均 150、周五还有位'的卡。"
+    primary_dimensions: ["decision_tempo", "novelty_appetite"]
+    secondary_dimensions: ["social_energy", "control_flow"]
+
+  elevator_choice:
+    id: "q_elevator_choice"
+    tier: 1
+    text: |
+      外卖平台刚刷出来一家新店，你手指停在上面 3 秒——
+      这 3 秒里你在干嘛？
+    options:
+      A:
+        text: "已经翻到评论区了"
+        signals:
+          decision_tempo: { value: -0.45, confidence: 0.30 }
+          sensory_cerebral: { value: -0.3, confidence: 0.20 }
+      B:
+        text: "点进图片看菜品"
+        signals:
+          decision_tempo: { value: -0.2, confidence: 0.15 }
+          sensory_cerebral: { value: 0.4, confidence: 0.25 }
+      C:
+        text: "看完店名就已经决定了"
+        signals:
+          decision_tempo: { value: 0.5, confidence: 0.30 }
+          novelty_appetite: { value: 0.3, confidence: 0.20 }
+      D:
+        text: "直接划走了"
+        signals:
+          decision_tempo: { value: 0.4, confidence: 0.25 }
+          novelty_appetite: { value: -0.3, confidence: 0.20 }
+    agent_responses:
+      A: "研究型选手。你从评论里读出来的信息量是我的三倍——我会把评论精要前置给你。"
+      B: "看图定胃口——视觉型。那我推荐也会先给图不是文字。"
+      C: "直觉型选手。你相信自己的第一反应——那我也会帮你保护这种反应，先上结论再解释。"
+      D: "稳。你知道什么是你不想要的，这已经省了大量时间。我以后也会学会更快地从你的'划走'里找规律。"
+    primary_dimensions: ["decision_tempo", "sensory_cerebral"]
+    secondary_dimensions: ["novelty_appetite"]
 
   # ============================================================
   # 第二梯队：深入题（更细腻的信号，需要一定信任基础）
@@ -183,39 +271,185 @@ questions:
     primary_dimensions: ["social_energy", "sensory_cerebral"]
     secondary_dimensions: ["novelty_appetite", "control_flow"]
 
-  gift_philosophy:
-    id: "q_gift"
+  fake_chat:
+    id: "q_fake_chat"
     tier: 2
-    text: "给好朋友选生日礼物，你的风格更接近——"
+    text: |
+      朋友发你这条消息：
+      "今晚想吃顿好的但不想自己挑，给我推一家"
+      你最可能回哪种？
     options:
       A:
-        text: "我早就知道 ta 想要什么"
+        text: "上次那家还不错，再去一次？"
         signals:
-          sensory_cerebral: { value: -0.3, confidence: 0.20 }
+          novelty_appetite: { value: -0.4, confidence: 0.25 }
           social_energy: { value: 0.3, confidence: 0.20 }
-          control_flow: { value: 0.3, confidence: 0.15 }
       B:
-        text: "不选特定的东西，带 ta 去体验"
+        text: "你今天想吃辣还是清淡"
         signals:
-          sensory_cerebral: { value: 0.4, confidence: 0.25 }
-          novelty_appetite: { value: 0.3, confidence: 0.20 }
+          control_flow: { value: 0.3, confidence: 0.20 }
+          decision_tempo: { value: -0.3, confidence: 0.20 }
       C:
-        text: "花很多时间挑，比起实用更在意'像不像我的风格'"
+        text: "[扔一个链接] 这家我昨天看到"
         signals:
-          sensory_cerebral: { value: 0.3, confidence: 0.20 }
-          control_flow: { value: 0.4, confidence: 0.20 }
+          novelty_appetite: { value: 0.5, confidence: 0.30 }
+          decision_tempo: { value: 0.3, confidence: 0.20 }
       D:
-        text: "直接问，选错不如不选"
+        text: "在吗我现在也饿了，一起"
+        signals:
+          social_energy: { value: 0.6, confidence: 0.30 }
+          decision_tempo: { value: 0.3, confidence: 0.15 }
+    agent_responses:
+      A: "你的记忆里有'安全屋'清单。我以后帮你维护这份清单——偶尔提醒你哪家要续一下。"
+      B: "先收集信息再出牌——典型的二次确认型。我给你的推荐也会带上'因为你说了辣'这种理由。"
+      C: "你平时就已经在囤'下次可能用得上'的店——这种人品味一般都很稳。我会给你留一个'新发现'的频道。"
+      D: "你能把一个推荐需求秒变聚餐。那我以后找地方也会考虑'顺手再约一个'的可能性。"
+    primary_dimensions: ["novelty_appetite", "social_energy"]
+    secondary_dimensions: ["decision_tempo", "control_flow"]
+
+  six_person_groupchat:
+    id: "q_macaron_group"
+    tier: 2
+    text: |
+      六人饭局的群刚被拉起来，其他人都在@"随便"。
+      你通常扮演——
+    options:
+      A:
+        text: "第一个扔链接的"
+        signals:
+          social_energy: { value: 0.4, confidence: 0.25 }
+          decision_tempo: { value: 0.4, confidence: 0.25 }
+          control_flow: { value: 0.3, confidence: 0.20 }
+      B:
+        text: "最后拍板的"
+        signals:
+          control_flow: { value: 0.5, confidence: 0.30 }
+          decision_tempo: { value: -0.2, confidence: 0.15 }
+      C:
+        text: "默默潜水等结论"
+        signals:
+          social_energy: { value: -0.4, confidence: 0.25 }
+          control_flow: { value: -0.3, confidence: 0.20 }
+      D:
+        text: "问一圈'你们都能吃什么'的"
+        signals:
+          social_energy: { value: 0.3, confidence: 0.20 }
+          sensory_cerebral: { value: -0.3, confidence: 0.20 }
+          decision_tempo: { value: -0.3, confidence: 0.20 }
+    agent_responses:
+      A: "你是那个让群别卡住的人。以后我帮你选地方的时候也会先给一家默认答案——你不用还得自己发起。"
+      B: "拍板型玩家。前面让大家讨论，最后看你的——我会给你精简到 2-3 个靠谱选项。"
+      C: "你的能量不适合无序的群聊。那我来帮你，把'这顿到底吃哪'三句话说清楚。"
+      D: "你比发起人还操心。下次我直接帮你收集群里的忌口，你就不用一个个问了。"
+    primary_dimensions: ["social_energy", "control_flow"]
+    secondary_dimensions: ["decision_tempo"]
+
+  late_night_hunger:
+    id: "q_macaron_cook"
+    tier: 2
+    text: |
+      深夜 11 点，肚子突然有点饿。
+      楼下烧烤摊的味道飘上来——你身体先做的事是？
+    options:
+      A:
+        text: "已经在翻外卖 app"
+        signals:
+          decision_tempo: { value: 0.5, confidence: 0.30 }
+          control_flow: { value: -0.2, confidence: 0.15 }
+      B:
+        text: "倒一杯水骗一下自己"
+        signals:
+          decision_tempo: { value: -0.4, confidence: 0.25 }
+          control_flow: { value: 0.4, confidence: 0.25 }
+      C:
+        text: "下楼买一串尝尝就回"
+        signals:
+          novelty_appetite: { value: 0.3, confidence: 0.20 }
+          sensory_cerebral: { value: 0.4, confidence: 0.25 }
+          decision_tempo: { value: 0.3, confidence: 0.20 }
+      D:
+        text: "默默关窗"
+        signals:
+          control_flow: { value: 0.5, confidence: 0.30 }
+          sensory_cerebral: { value: -0.2, confidence: 0.15 }
+    agent_responses:
+      A: "听身体话的选手——别人还在纠结你已经在等骑手了。我以后给你的推荐会把'送达时间'放前面。"
+      B: "你能赢自己。但作为生活搭子我还是会偶尔怂恿你一下，别太亏待自己。"
+      C: "'体验一下'就值——你对气味和现场很敏感。我会多给你推可以现场感受的地方。"
+      D: "自控力选手。那我以后不会在深夜主动推吃的给你——你愿意聊的时候我再上。"
+    primary_dimensions: ["decision_tempo", "sensory_cerebral"]
+    secondary_dimensions: ["control_flow", "novelty_appetite"]
+
+  two_restaurant_wait:
+    id: "q_two_restaurant_wait"
+    tier: 2
+    text: |
+      两家邻近的店你都没去过——
+      一家要等 40 分钟，一家可以马上坐下。
+      你通常怎么选？
+    options:
+      A:
+        text: "等 40 分钟的那家（能等 40 分钟肯定有原因）"
+        signals:
+          decision_tempo: { value: -0.4, confidence: 0.25 }
+          novelty_appetite: { value: 0.3, confidence: 0.20 }
+      B:
+        text: "能坐下的那家（省的就是时间）"
+        signals:
+          decision_tempo: { value: 0.5, confidence: 0.30 }
+          control_flow: { value: -0.2, confidence: 0.15 }
+      C:
+        text: "再刷两眼点评决定"
+        signals:
+          decision_tempo: { value: -0.5, confidence: 0.30 }
+          sensory_cerebral: { value: -0.4, confidence: 0.25 }
+      D:
+        text: "走远一点换第三家"
+        signals:
+          novelty_appetite: { value: 0.4, confidence: 0.25 }
+          control_flow: { value: 0.3, confidence: 0.20 }
+    agent_responses:
+      A: "你愿意为'可能的惊喜'付时间。那我以后在热门店那一列会把等位时间算清楚再推你。"
+      B: "时间是你的硬成本。那我会把'现在就能坐'作为一条常驻筛选线。"
+      C: "你不让自己后悔——先拿证据再决定。我以后会把对比摆在你面前，不替你跳过这一步。"
+      D: "你不愿意被两个选项夹住——典型的保留第三选项型。那我推荐也会给你留一个'跳出来想'的选项。"
+    primary_dimensions: ["decision_tempo", "novelty_appetite"]
+    secondary_dimensions: ["control_flow", "sensory_cerebral"]
+
+  cart_abandonment:
+    id: "q_cart_abandonment"
+    tier: 2
+    text: |
+      你的购物车里躺了一件东西 11 天了——
+      最可能的后续是？
+    options:
+      A:
+        text: "今天就下单，拖够了"
+        signals:
+          decision_tempo: { value: 0.4, confidence: 0.25 }
+          sensory_cerebral: { value: 0.2, confidence: 0.15 }
+      B:
+        text: "再等一次折扣"
+        signals:
+          decision_tempo: { value: -0.4, confidence: 0.25 }
+          sensory_cerebral: { value: -0.3, confidence: 0.20 }
+      C:
+        text: "干脆删掉，留着就是不想要"
+        signals:
+          decision_tempo: { value: 0.3, confidence: 0.20 }
+          control_flow: { value: 0.4, confidence: 0.25 }
+      D:
+        text: "买一个更便宜的替代品"
         signals:
           decision_tempo: { value: -0.2, confidence: 0.15 }
           sensory_cerebral: { value: -0.4, confidence: 0.25 }
     agent_responses:
-      A: "细节观察者。你肯定是朋友圈里最靠谱的那个——我也会努力做到'你还没说我就知道你要什么'。"
-      B: "体验 > 物品。你选餐厅的时候估计也是——'去过'比'吃过什么'更重要。"
-      C: "你送的不是礼物，是审美声明。我猜你选餐厅也有自己的调性——我会学习你的品味。"
-      D: "效率至上，不浪费彼此的时间。那我以后也不跟你绕弯子——直接给最佳选项。"
-    primary_dimensions: ["sensory_cerebral"]
-    secondary_dimensions: ["social_energy", "control_flow", "novelty_appetite"]
+      A: "你给自己一个明确的期限。那我以后给你找东西也会直接给截止时间：'今晚 8 点前拍板'。"
+      B: "耐心换空间。那我会帮你盯着价格线，降到阈值我告诉你。"
+      C: "你对'没下单'本身就是信号——果断而不自我欺骗。我会学会从你的'不选'里读出更多。"
+      D: "你会给自己找到替代路径。那我以后推 A 的时候会顺手给你一个 B。"
+    primary_dimensions: ["decision_tempo", "sensory_cerebral"]
+    secondary_dimensions: ["control_flow", "novelty_appetite"]
 
   # ============================================================
   # 第三梯队：验证题（用于 Agent 已有初步画像后的验证和深化）
@@ -255,180 +489,75 @@ questions:
     primary_dimensions: ["novelty_appetite", "sensory_cerebral"]
     secondary_dimensions: ["social_energy"]
 
-  superpower:
-    id: "q_superpower"
+  ai_twin:
+    id: "q_ai_twin"
     tier: 3
-    text: "如果你能拥有一个跟'吃'有关的超能力——"
+    text: |
+      假设你有一个 AI 分身能替你拍板——
+      你最希望它在哪种时刻帮你做决定？
     options:
       A:
-        text: "永远知道方圆一公里内最好吃的是什么"
+        text: "点菜的 5 秒钟"
         signals:
-          control_flow: { value: 0.4, confidence: 0.20 }
-          decision_tempo: { value: 0.3, confidence: 0.15 }
+          decision_tempo: { value: -0.4, confidence: 0.25 }
+          sensory_cerebral: { value: -0.2, confidence: 0.15 }
       B:
-        text: "吃任何东西都能尝出完整的食材和调味"
+        text: "要不要出门的那一刻"
         signals:
-          sensory_cerebral: { value: 0.5, confidence: 0.25 }
+          control_flow: { value: -0.5, confidence: 0.30 }
           novelty_appetite: { value: 0.2, confidence: 0.10 }
       C:
-        text: "做任何菜都能一次成功"
-        signals:
-          control_flow: { value: 0.4, confidence: 0.20 }
-          sensory_cerebral: { value: 0.1, confidence: 0.10 }
-      D:
-        text: "吃饭永远能找到最合适的人一起"
-        signals:
-          social_energy: { value: 0.6, confidence: 0.30 }
-          control_flow: { value: -0.1, confidence: 0.10 }
-    agent_responses:
-      A: "你要的不是'好不好吃'，而是'确定好吃'。我就是那个帮你扫雷的。"
-      B: "美食鉴赏家的灵魂。你吃一顿饭获取的信息量大概是普通人的三倍。"
-      C: "厨房是你的战场。那我以后可以多给你推食谱和技法，而不只是餐厅。"
-      D: "你最在意的是'跟谁吃'——食物是载体，人才是目的。"
-    primary_dimensions: ["sensory_cerebral", "social_energy"]
-    secondary_dimensions: ["control_flow", "decision_tempo"]
-
-  # ============================================================
-  # Macaron 能力题：选项本身告诉用户 Macaron 能干什么
-  # 同时采集画像信号——一题双用
-  # ============================================================
-
-  macaron_friday_dinner:
-    id: "q_macaron_friday"
-    tier: 1
-    text: |
-      周五下班，不想动脑。你希望 Macaron 怎么帮你搞定晚饭？
-    options:
-      A:
-        text: "直接帮我订一家我以前去过的"
-        signals:
-          novelty_appetite: { value: -0.4, confidence: 0.25 }
-          control_flow: { value: -0.3, confidence: 0.20 }
-      B:
-        text: "给我 3 家新开的、我没去过的"
-        signals:
-          novelty_appetite: { value: 0.5, confidence: 0.30 }
-          control_flow: { value: 0.3, confidence: 0.20 }
-      C:
-        text: "找一家评分稳、不会踩雷的"
-        signals:
-          sensory_cerebral: { value: -0.4, confidence: 0.25 }
-          decision_tempo: { value: -0.2, confidence: 0.15 }
-      D:
-        text: "帮我叫外卖，我要在家看剧"
+        text: "要不要回那条消息"
         signals:
           social_energy: { value: -0.3, confidence: 0.20 }
-          control_flow: { value: -0.3, confidence: 0.20 }
+          decision_tempo: { value: -0.3, confidence: 0.20 }
+      D:
+        text: "买不买这件稍贵但心动的东西"
+        signals:
+          decision_tempo: { value: -0.4, confidence: 0.25 }
+          sensory_cerebral: { value: 0.3, confidence: 0.20 }
     agent_responses:
-      A: "行，你那几家\"老地方\"我会挨个记住，以后一句\"老样子\"就行。"
-      B: "好，我以后每次推荐里都给你藏一家没去过的——你负责尝，我负责找。"
-      C: "收到，不踩雷路线。我会先看评分分布稳不稳定，再看差评里的共性。"
-      D: "可以，在家我也能帮你，外卖 + 配一集下饭剧都行。"
-    primary_dimensions: ["novelty_appetite", "control_flow"]
+      A: "你最讨厌的是那 5 秒——我以后点菜给你默认值，你不爽再换。"
+      B: "出不出门这个决定对你其实是最重的那个。我会在周末早上先帮你过一遍天气、热度、朋友档期，再轻轻推你一下。"
+      C: "人际决策最耗你能量。我不是那个能帮你的 AI，但我可以帮你把该回的消息之外的杂事都减掉。"
+      D: "'想要'和'要不要'之间那条线你想让别人帮你划。我不会替你决定，但我会帮你把后悔成本算清楚。"
+    primary_dimensions: ["decision_tempo", "control_flow"]
     secondary_dimensions: ["sensory_cerebral", "social_energy"]
 
-  macaron_weekend_group:
-    id: "q_macaron_group"
-    tier: 1
+  fake_review:
+    id: "q_macaron_plan"
+    tier: 3
     text: |
-      周六 6 个人聚餐，你先把这事儿扔给 Macaron——让它做什么？
+      平台把这家店这样描述给你——
+      哪句最能让你点进去？
     options:
       A:
-        text: "发个投票，让大家挑想吃什么"
+        text: "连续三个月本区域预订量第一"
         signals:
-          social_energy: { value: 0.4, confidence: 0.25 }
-          control_flow: { value: -0.3, confidence: 0.20 }
+          sensory_cerebral: { value: -0.4, confidence: 0.25 }
+          novelty_appetite: { value: -0.3, confidence: 0.20 }
       B:
-        text: "按大家口味交集直接选一家"
+        text: "开业 21 天，只有 47 条评价，但 46 条都提到同一道菜"
+        signals:
+          novelty_appetite: { value: 0.5, confidence: 0.30 }
+          sensory_cerebral: { value: 0.3, confidence: 0.20 }
+      C:
+        text: "你关注的那位博主上周刚去过"
         signals:
           social_energy: { value: 0.3, confidence: 0.20 }
-          control_flow: { value: -0.2, confidence: 0.15 }
-          decision_tempo: { value: 0.3, confidence: 0.20 }
-      C:
-        text: "给我 3 家候选，我自己拍板"
-        signals:
-          control_flow: { value: 0.4, confidence: 0.25 }
-          decision_tempo: { value: -0.2, confidence: 0.15 }
+          novelty_appetite: { value: 0.2, confidence: 0.15 }
       D:
-        text: "不用它，我自己开群搞定"
+        text: "老板说欢迎一个人来，有吧台位"
         signals:
-          social_energy: { value: 0.2, confidence: 0.10 }
-          control_flow: { value: 0.5, confidence: 0.30 }
+          social_energy: { value: -0.5, confidence: 0.30 }
+          sensory_cerebral: { value: 0.4, confidence: 0.25 }
     agent_responses:
-      A: "好，那我就是你的局局助理——投票、催票、定位我全包。"
-      B: "懂，直接出答案。我会学每个人的偏好，下次交集算得更准。"
-      C: "行，我给你列 3 家带理由，你拍板。"
-      D: "你是那种自己能搞定的人。那我就做你不想做的那部分——订位、导航、提醒。"
-    primary_dimensions: ["social_energy", "control_flow"]
-    secondary_dimensions: ["decision_tempo"]
-
-  macaron_home_cook:
-    id: "q_macaron_cook"
-    tier: 2
-    text: |
-      打开冰箱：鸡蛋、一块味噌、一根葱。你想 Macaron 做什么？
-    options:
-      A:
-        text: "直接给我一道 10 分钟能上桌的"
-        signals:
-          decision_tempo: { value: 0.4, confidence: 0.25 }
-          control_flow: { value: -0.3, confidence: 0.20 }
-      B:
-        text: "给 3 个方案，我挑一个"
-        signals:
-          decision_tempo: { value: -0.3, confidence: 0.20 }
-          control_flow: { value: 0.4, confidence: 0.25 }
-      C:
-        text: "讲讲这三样能怎么搭，我学一学"
-        signals:
-          sensory_cerebral: { value: 0.3, confidence: 0.20 }
-          decision_tempo: { value: -0.3, confidence: 0.20 }
-      D:
-        text: "算了，帮我叫个外卖"
-        signals:
-          control_flow: { value: -0.3, confidence: 0.20 }
-          novelty_appetite: { value: -0.1, confidence: 0.10 }
-    agent_responses:
-      A: "好，一道菜一个步骤表，不废话。"
-      B: "收到，我会给你 3 个风格不同的选项，附预估时间。"
-      C: "你是厨房炼金术士苗子——我给你讲原理，不只是菜谱。"
-      D: "那我接外卖这条线——附近 15 分钟内能送到的 3 家，马上给你。"
-    primary_dimensions: ["decision_tempo", "control_flow"]
-    secondary_dimensions: ["sensory_cerebral"]
-
-  macaron_weekend_plan:
-    id: "q_macaron_plan"
-    tier: 2
-    text: |
-      周六一整天是空的。你希望 Macaron 给你什么？
-    options:
-      A:
-        text: "一整张从早到晚的行程表"
-        signals:
-          control_flow: { value: 0.5, confidence: 0.30 }
-          decision_tempo: { value: -0.3, confidence: 0.20 }
-      B:
-        text: "3 个\"可能你会喜欢\"的方向，我随便选"
-        signals:
-          novelty_appetite: { value: 0.4, confidence: 0.25 }
-          control_flow: { value: -0.2, confidence: 0.15 }
-      C:
-        text: "只给我一件事，别太满"
-        signals:
-          social_energy: { value: -0.3, confidence: 0.20 }
-          control_flow: { value: -0.2, confidence: 0.15 }
-      D:
-        text: "别规划，我想躺着"
-        signals:
-          control_flow: { value: -0.4, confidence: 0.25 }
-          decision_tempo: { value: 0.2, confidence: 0.10 }
-    agent_responses:
-      A: "行，从早餐到夜宵，每一格我都帮你填上。"
-      B: "好，我喜欢这种——3 个方向像盲盒，你负责拆。"
-      C: "懂，一件正经事加半天发呆。这才是周末。"
-      D: "尊重躺平，我只在你想出门时冒个头。"
-    primary_dimensions: ["control_flow", "decision_tempo"]
-    secondary_dimensions: ["novelty_appetite", "social_energy"]
+      A: "你吃数据那一套——群体验证过的东西心里更踏实。我会给你先过一遍热度和稳定性。"
+      B: "你对'刚冒头的好东西'最敏感。那我以后推荐里会给你留一个'小众但凶'的位置。"
+      C: "你对'我认识的人去过'这种信号最有反应。那我以后会给你加一个'你关注的博主最近都在哪'的追踪。"
+      D: "你要的是一个人也舒服的空间。'吧台位'和'老板愿意聊'是你的关键词——我会把它作为排序维度。"
+    primary_dimensions: ["sensory_cerebral", "novelty_appetite"]
+    secondary_dimensions: ["social_energy"]
 
 # 选题策略配置
 selection_strategy:
